@@ -230,25 +230,54 @@
             document.getElementById('import-btn').disabled = !value;
         };
 
-        window.handleImport = () => {
+        window.handleImport = async () => {
             if (!state.importUrl) return;
             state.isImporting = true;
             render();
             
-            setTimeout(() => {
-                state.formData = {
-                    title: state.importType === 'confluence' ? 'PRD: Customer Portal V2 (Imported)' : 'Spec: Support Bot Rollout (Imported)',
-                    objective: 'Reduce inbound ticket volume by implementing self-service features and AI.',
-                    scope: 'All global customers. Impacts Support and Customer Success teams.',
-                    techSummary: 'Frontend rewrite in React. New API gateway routing for self-serve actions.',
-                    timeline: '2026-11-01',
-                    dependencies: 'Requires updated Zendesk macros and new agent training.',
-                    riskLevel: 'High'
-                };
+            try {
+                if (isConnectedToSupabase) {
+                    console.log("Calling Edge Function with URL:", state.importUrl);
+                    
+                    // Call the real Supabase Edge Function
+                    const { data, error } = await supabaseClient.functions.invoke('import-doc', {
+                        body: { url: state.importUrl, type: state.importType }
+                    });
+
+                    console.log("Edge Function Response:", { data, error });
+
+                    if (error) {
+                        throw new Error(error.message || "Supabase invocation failed");
+                    }
+
+                    if (data && data.success) {
+                        // Merge the parsed data with our form data
+                        state.formData = {
+                            ...state.formData,
+                            title: data.parsed.title || '',
+                            objective: data.parsed.objective || '',
+                            scope: data.parsed.scope || '',
+                            techSummary: data.parsed.techSummary || '',
+                            dependencies: data.parsed.dependencies || '',
+                        };
+                    } else if (data && !data.success) {
+                        // This will catch explicit errors from our Edge Function
+                        throw new Error(data.error || "Unknown error from backend");
+                    } else {
+                        throw new Error("No data returned from backend");
+                    }
+                } else {
+                    throw new Error("Supabase is not connected.");
+                }
+            } catch (err) {
+                console.error("Failed to import document:", err);
+                // Better error alert so we can see exactly what failed
+                alert("Import Failed: " + err.message);
+            } finally {
                 state.isImporting = false;
                 state.importUrl = '';
                 render();
-            }, 1500);
+            }
         };
 
         window.handleFormSubmit = async (e) => {
