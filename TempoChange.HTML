@@ -455,14 +455,14 @@
                                 <input type="url" value="${escapeHTML(state.importUrl)}" oninput="handleImportUrlInput(this.value)" placeholder="${placeholder}" class="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white"/>
                             </div>
                         </div>
-                        <button type="button" id="import-btn" onclick="handleImport()" ${!state.importUrl || state.isImporting ? 'disabled' : ''} class="bg-slate-800 hover:bg-slate-900 disabled:bg-slate-400 text-white px-6 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 h-[42px]">
-                            ${state.isImporting ? '<i class="ph-bold ph-spinner animate-spin"></i>' : 'Fetch & Auto-fill'}
+                        <button type="button" id="import-btn" onclick="handleImport()" ${!state.importUrl || state.isImporting ? 'disabled' : ''} class="bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-400 text-white px-6 py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 h-[42px] min-w-[180px]">
+                            ${state.isImporting ? '<i class="ph-bold ph-spinner animate-spin"></i> Analyzing with AI...' : '<i class="ph-bold ph-magic-wand"></i> AI Fetch & Auto-fill'}
                         </button>
                     </div>
                 `;
             }
 
-            const autoBadge = (state.formData.title && state.importType !== 'manual') ? `<span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-bold ml-2">Auto-populated</span>` : '';
+            const autoBadge = (state.formData.title && state.importType !== 'manual') ? `<span class="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full font-bold ml-2 flex items-center gap-1"><i class="ph-fill ph-sparkle"></i> AI Extracted</span>` : '';
 
             return `
                 <div class="max-w-3xl mx-auto space-y-6 fade-in">
