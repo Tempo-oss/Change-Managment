@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChangeSync - Change Integration Hub</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <!-- Supabase JS Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <style>
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { 
+            from { opacity: 0; transform: translateY(10px); } 
+            to { opacity: 1; transform: translateY(0); } 
+        }
+        /* Custom scrollbar for a cleaner look */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="bg-slate-50 font-sans text-slate-900 min-h-screen flex">
+
+    <!-- Sidebar -->
+    <aside class="w-64 bg-slate-900 text-slate-300 flex-col hidden md:flex h-screen sticky top-0">
+        <div class="p-6 border-b border-slate-800 flex items-center gap-3">
+            <div class="bg-indigo-500 p-2 rounded-lg">
+                <i class="ph-bold ph-list-checks text-white text-xl"></i>
+            </div>
+            <span class="text-xl font-bold text-white tracking-wide">ChangeSync</span>
+        </div>
+        
+        <nav class="flex-1 py-6 px-4 space-y-2" id="nav-menu">
+            <!-- Nav buttons injected via JS -->
+        </nav>
+        
+        <div class="p-4 border-t border-slate-800">
+            <div class="flex items-center gap-3 px-4 py-2">
+                <div class="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-sm font-bold text-white border border-slate-600">
+                    CI
+                </div>
+                <div class="text-sm">
+                    <p class="font-semibold text-white">Integration Mgr</p>
+                    <p class="text-xs text-slate-500">Admin</p>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 overflow-y-auto min-h-screen relative">
+        <div id="supabase-banner" class="bg-amber-100 text-amber-800 text-sm px-4 py-2 text-center font-medium hidden">
+            Running in Local Prototype Mode. Add Supabase keys to enable cloud sync.
+        </div>
+        <div class="max-w-6xl mx-auto p-6 md:p-10" id="app-root">
+            <!-- Content injected via JS -->
+        </div>
+    </main>
+
+    <script>
+        // ==========================================
+        // CONFIGURATION & SETUP
+        // ==========================================
+        
+        // ADD YOUR SUPABASE KEYS HERE
+        const SUPABASE_URL = 'https://paplnlekrwscsxnxiviz.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhcGxubGVrcndzY3N4bnhpdml6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5NTA2ODgsImV4cCI6MjA4NzUyNjY4OH0.HJ9izkfAqmcSnekGVA-Trg6MSBW-m7PwTQByEHXJZ-o';
+        
+        let supabaseClient = null;
+        let isConnectedToSupabase = false;
+
+        if (SUPABASE_URL !== 'YOUR_SUPABASE_URL' && SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY') {
+            supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            isConnectedToSupabase = true;
+        } else {
+            document.getElementById('supabase-banner').classList.remove('hidden');
+        }
+
+        // ==========================================
+        // STATE MANAGEMENT
+        // ==========================================
+        let state = {
+            currentView: 'dashboard',
+            projects: [],
+            selectedProjectId: null,
+            importType: 'manual',
+            isImporting: false,
+            formData: {
+                title: '', objective: '', scope: '', techSummary: '', timeline: '', dependencies: '', riskLevel: 'Medium'
+            },
+            importUrl: ''
+        };
+
+        const initialProjects = [
+            {
+                id: 'proj-1',
+                title: 'Q3 Payment Gateway Migration',
+                objective: 'Migrate core payment processing to Stripe to reduce transaction fees.',
+                scope: 'All NA and EU transactions. Excludes APAC for now.',
+                techSummary: 'API swap from LegacyPay to Stripe V3. Requires new webhook handling.',
+                timeline: '2026-08-01',
+                impactLevel: 'High',
+                status: 'In Progress',
+                approvalGate: 'Pending',
+                tasks: {
+                    operations: [
+                        { id: 't1', title: 'SOP changes required', status: 'Completed', owner: 'Sarah J.', dueDate: '2026-06-15', type: 'ops' },
+                        { id: 't2', title: 'Workflow updates', status: 'In Progress', owner: 'Mike T.', dueDate: '2026-06-20', type: 'ops' },
+                        { id: 't3', title: 'Tool/process adjustments', status: 'Blocked', owner: 'Sarah J.', dueDate: '2026-06-25', type: 'ops' },
+                    ],
+                    training: [
+                        { id: 't4', title: 'Knowledge base updates', status: 'In Progress', owner: 'David L.', dueDate: '2026-07-01', type: 'trn' },
+                        { id: 't5', title: 'LMS content updates', status: 'Not Started', owner: 'Emma W.', dueDate: '2026-07-10', type: 'trn' },
+                    ],
+                    quality: [
+                        { id: 't6', title: 'QA form adjustments', status: 'Completed', owner: 'Chris P.', dueDate: '2026-06-10', type: 'qa' },
+                        { id: 't7', title: 'New audit criteria', status: 'Completed', owner: 'Chris P.', dueDate: '2026-06-12', type: 'qa' },
+                    ]
+                }
+            }
+        ];
+
+        // ==========================================
+        // CORE FUNCTIONS
+        // ==========================================
+
+        async function init() {
+            if (isConnectedToSupabase) {
+                const { data, error } = await supabaseClient.from('projects').select('*');
+                if (error) {
+                    console.error("Supabase Error:", error);
+                    state.projects = [...initialProjects]; // Fallback
+                } else {
+                    state.projects = data || [];
+                }
+            } else {
+                state.projects = [...initialProjects];
+            }
+            render();
+        }
+
+        async function saveProjectToDB(project) {
+            if (isConnectedToSupabase) {
+                const { error } = await supabaseClient.from('projects').upsert(project);
+                if (error) console.error("Error saving to Supabase:", error);
+            }
+        }
+
+        // ==========================================
+        // HELPERS
+        // ==========================================
+        
+        const generateDefaultTasks = (dept) => {
+            const ts = Date.now();
+            const defaultTasks = {
+                operations: [
+                    { id: `ops-1-${ts}`, title: 'SOP changes required', status: 'Not Started', owner: '', dueDate: '', type: 'ops' },
+                    { id: `ops-2-${ts}`, title: 'Workflow updates', status: 'Not Started', owner: '', dueDate: '', type: 'ops' },
+                    { id: `ops-3-${ts}`, title: 'Tool/process adjustments', status: 'Not Started', owner: '', dueDate: '', type: 'ops' },
+                    { id: `ops-4-${ts}`, title: 'Required communications', status: 'Not Started', owner: '', dueDate: '', type: 'ops' },
+                    { id: `ops-5-${ts}`, title: 'Launch readiness checklist', status: 'Not Started', owner: '', dueDate: '', type: 'ops' },
+                ],
+                training: [
+                    { id: `trn-1-${ts}`, title: 'Knowledge base updates', status: 'Not Started', owner: '', dueDate: '', type: 'trn' },
+                    { id: `trn-2-${ts}`, title: 'LMS content updates', status: 'Not Started', owner: '', dueDate: '', type: 'trn' },
+                    { id: `trn-3-${ts}`, title: 'Agent enablement materials', status: 'Not Started', owner: '', dueDate: '', type: 'trn' },
+                    { id: `trn-4-${ts}`, title: 'Certification requirements', status: 'Not Started', owner: '', dueDate: '', type: 'trn' },
+                ],
+                quality: [
+                    { id: `qa-1-${ts}`, title: 'QA form adjustments', status: 'Not Started', owner: '', dueDate: '', type: 'qa' },
+                    { id: `qa-2-${ts}`, title: 'New audit criteria', status: 'Not Started', owner: '', dueDate: '', type: 'qa' },
+                    { id: `qa-3-${ts}`, title: 'Calibration requirements', status: 'Not Started', owner: '', dueDate: '', type: 'qa' },
+                    { id: `qa-4-${ts}`, title: 'Risk monitoring metrics', status: 'Not Started', owner: '', dueDate: '', type: 'qa' },
+                ]
+            };
+            return defaultTasks[dept] || [];
+        };
+
+        const calculateReadiness = (tasks) => {
+            if (!tasks || tasks.length === 0) return 0;
+            const completed = tasks.filter(t => t.status === 'Completed').length;
+            return Math.round((completed / tasks.length) * 100);
+        };
+
+        const calculateOverallReadiness = (projectTasks) => {
+            const allTasks = [...(projectTasks.operations||[]), ...(projectTasks.training||[]), ...(projectTasks.quality||[])];
+            return calculateReadiness(allTasks);
+        };
+
+        const escapeHTML = (str) => {
+            return str ? str.toString().replace(/[&<>'"]/g, 
+                tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
+            ) : '';
+        };
+
+        // ==========================================
+        // EVENT HANDLERS (Attached to Window)
+        // ==========================================
+
+        window.navigate = (view) => {
+            state.currentView = view;
+            render();
+        };
+
+        window.openProject = (id) => {
+            state.selectedProjectId = id;
+            navigate('project-detail');
+        };
+
+        window.setImportType = (type) => {
+            state.importType = type;
+            state.importUrl = '';
+            render();
+        };
+
+        window.handleFormInput = (name, value) => {
+            state.formData[name] = value;
+        };
+
+        window.handleImportUrlInput = (value) => {
+            state.importUrl = value;
+            document.getElementById('import-btn').disabled = !value;
+        };
+
+        window.handleImport = () => {
+            if (!state.importUrl) return;
+            state.isImporting = true;
+            render();
+            
+            setTimeout(() => {
+                state.formData = {
+                    title: state.importType === 'confluence' ? 'PRD: Customer Portal V2 (Imported)' : 'Spec: Support Bot Rollout (Imported)',
+                    objective: 'Reduce inbound ticket volume by implementing self-service features and AI.',
+                    scope: 'All global customers. Impacts Support and Customer Success teams.',
+                    techSummary: 'Frontend rewrite in React. New API gateway routing for self-serve actions.',
+                    timeline: '2026-11-01',
+                    dependencies: 'Requires updated Zendesk macros and new agent training.',
+                    riskLevel: 'High'
+                };
+                state.isImporting = false;
+                state.importUrl = '';
+                render();
+            }, 1500);
+        };
+
+        window.handleFormSubmit = async (e) => {
+            e.preventDefault();
+            const newProject = {
+                id: `proj-${Date.now()}`,
+                ...state.formData,
+                impactLevel: state.formData.riskLevel,
+                status: 'In Progress',
+                approvalGate: 'Pending',
+                tasks: {
+                    operations: generateDefaultTasks('operations'),
+                    training: generateDefaultTasks('training'),
+                    quality: generateDefaultTasks('quality'),
+                }
+            };
+            
+            state.projects.push(newProject);
+            await saveProjectToDB(newProject);
+            
+            state.formData = { title: '', objective: '', scope: '', techSummary: '', timeline: '', dependencies: '', riskLevel: 'Medium' };
+            state.importType = 'manual';
+            navigate('dashboard');
+        };
+
+        window.updateTaskStatus = async (projectId, dept, taskId, newStatus) => {
+            const project = state.projects.find(p => p.id === projectId);
+            if (!project) return;
+            
+            const task = project.tasks[dept].find(t => t.id === taskId);
+            if (task) task.status = newStatus;
+            
+            render(); // Fast UI update
+            await saveProjectToDB(project); // Background save
+        };
+
+        window.updateTaskDetail = async (projectId, dept, taskId, field, value) => {
+             const project = state.projects.find(p => p.id === projectId);
+             if (!project) return;
+             const task = project.tasks[dept].find(t => t.id === taskId);
+             if (task) task[field] = value;
+             await saveProjectToDB(project);
+        };
+
+        window.updateApprovalGate = async (projectId) => {
+            const project = state.projects.find(p => p.id === projectId);
+            if (!project) return;
+            project.approvalGate = project.approvalGate === 'Go' ? 'No-Go' : 'Go';
+            render();
+            await saveProjectToDB(project);
+        };
+
+        // ==========================================
+        // RENDERING LOGIC
+        // ==========================================
+
+        function renderNav() {
+            const nav = document.getElementById('nav-menu');
+            nav.innerHTML = `
+                <button onclick="navigate('dashboard')" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${state.currentView === 'dashboard' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800 hover:text-white'}">
+                    <i class="ph ph-squares-four text-lg"></i> Dashboard
+                </button>
+                <button onclick="navigate('intake')" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${state.currentView === 'intake' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800 hover:text-white'}">
+                    <i class="ph ph-folder-plus text-lg"></i> New Intake
+                </button>
+                <button class="w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors hover:bg-slate-800 hover:text-white opacity-50 cursor-not-allowed" title="Coming Soon">
+                    <i class="ph ph-gear text-lg"></i> Configurations
+                </button>
+            `;
+        }
+
+        function renderDashboard() {
+            const totalProjects = state.projects.length;
+            const blockedProjects = state.projects.filter(p => 
+                [...(p.tasks.operations||[]), ...(p.tasks.training||[]), ...(p.tasks.quality||[])].some(t => t.status === 'Blocked')
+            ).length;
+            
+            const avgReadiness = totalProjects > 0 
+                ? Math.round(state.projects.reduce((acc, p) => acc + calculateOverallReadiness(p.tasks), 0) / totalProjects)
+                : 0;
+
+            let projectsHtml = '';
+            if (totalProjects === 0) {
+                projectsHtml = `<div class="p-12 text-center text-slate-500">No active projects. Create one to get started.</div>`;
+            } else {
+                projectsHtml = state.projects.map(project => {
+                    const opsReadiness = calculateReadiness(project.tasks.operations);
+                    const trnReadiness = calculateReadiness(project.tasks.training);
+                    const qaReadiness = calculateReadiness(project.tasks.quality);
+                    const overall = calculateOverallReadiness(project.tasks);
+                    
+                    const impactClass = project.impactLevel === 'High' ? 'bg-red-50 text-red-700 border-red-200' : 
+                                        project.impactLevel === 'Medium' ? 'bg-orange-50 text-orange-700 border-orange-200' : 
+                                        'bg-green-50 text-green-700 border-green-200';
+
+                    return `
+                        <div class="p-6 hover:bg-slate-50 transition-colors cursor-pointer" onclick="openProject('${project.id}')">
+                            <div class="flex justify-between items-start mb-4">
+                                <div>
+                                    <h3 class="text-lg font-bold text-indigo-900">${escapeHTML(project.title)}</h3>
+                                    <p class="text-sm text-slate-500 mt-1 line-clamp-1">${escapeHTML(project.objective)}</p>
+                                </div>
+                                <span class="px-3 py-1 rounded-full text-xs font-semibold border ${impactClass}">
+                                    ${escapeHTML(project.impactLevel)} Impact
+                                </span>
+                            </div>
+                            
+                            <div class="grid grid-cols-4 gap-4 mt-6">
+                                <div class="col-span-4 md:col-span-1 border-r border-slate-100 pr-4">
+                                    <div class="flex justify-between text-sm mb-1"><span class="font-semibold text-slate-700">Overall</span><span class="text-slate-600">${overall}%</span></div>
+                                    <div class="w-full bg-slate-100 rounded-full h-2"><div class="bg-indigo-600 h-2 rounded-full transition-all duration-500" style="width: ${overall}%"></div></div>
+                                </div>
+                                <div class="col-span-4 md:col-span-1 border-r border-slate-100 pr-4">
+                                    <div class="flex justify-between text-sm mb-1"><span class="text-slate-600 flex items-center gap-1"><i class="ph ph-users"></i> Ops</span><span class="text-slate-600">${opsReadiness}%</span></div>
+                                    <div class="w-full bg-slate-100 rounded-full h-2"><div class="bg-blue-500 h-2 rounded-full transition-all duration-500" style="width: ${opsReadiness}%"></div></div>
+                                </div>
+                                <div class="col-span-4 md:col-span-1 border-r border-slate-100 pr-4">
+                                    <div class="flex justify-between text-sm mb-1"><span class="text-slate-600 flex items-center gap-1"><i class="ph ph-book-open"></i> Training</span><span class="text-slate-600">${trnReadiness}%</span></div>
+                                    <div class="w-full bg-slate-100 rounded-full h-2"><div class="bg-amber-500 h-2 rounded-full transition-all duration-500" style="width: ${trnReadiness}%"></div></div>
+                                </div>
+                                <div class="col-span-4 md:col-span-1">
+                                    <div class="flex justify-between text-sm mb-1"><span class="text-slate-600 flex items-center gap-1"><i class="ph ph-crosshair"></i> Quality</span><span class="text-slate-600">${qaReadiness}%</span></div>
+                                    <div class="w-full bg-slate-100 rounded-full h-2"><div class="bg-emerald-500 h-2 rounded-full transition-all duration-500" style="width: ${qaReadiness}%"></div></div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            return `
+                <div class="space-y-6 fade-in">
+                    <header class="mb-8">
+                        <h1 class="text-2xl font-bold text-slate-800">Change Readiness Dashboard</h1>
+                        <p class="text-slate-500">Overview of all active integrations and operational readiness.</p>
+                    </header>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center space-x-4">
+                            <div class="p-3 bg-indigo-100 rounded-lg text-indigo-600"><i class="ph-bold ph-folder-plus text-2xl"></i></div>
+                            <div><p class="text-sm font-medium text-slate-500">Active Integrations</p><h3 class="text-2xl font-bold text-slate-800">${totalProjects}</h3></div>
+                        </div>
+                        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center space-x-4">
+                            <div class="p-3 bg-emerald-100 rounded-lg text-emerald-600"><i class="ph-bold ph-crosshair text-2xl"></i></div>
+                            <div><p class="text-sm font-medium text-slate-500">Avg Global Readiness</p><h3 class="text-2xl font-bold text-slate-800">${avgReadiness}%</h3></div>
+                        </div>
+                        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center space-x-4">
+                            <div class="p-3 bg-rose-100 rounded-lg text-rose-600"><i class="ph-bold ph-warning-circle text-2xl"></i></div>
+                            <div><p class="text-sm font-medium text-slate-500">Blocked Workstreams</p><h3 class="text-2xl font-bold text-slate-800">${blockedProjects}</h3></div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="p-6 border-b border-slate-200"><h2 class="text-lg font-bold text-slate-800">Active Projects</h2></div>
+                        <div class="divide-y divide-slate-100">${projectsHtml}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderIntake() {
+            const manualClass = state.importType === 'manual' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50';
+            const confClass = state.importType === 'confluence' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50';
+            const docsClass = state.importType === 'gdocs' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50';
+            
+            let importSectionHtml = '';
+            if (state.importType !== 'manual') {
+                const placeholder = state.importType === 'confluence' ? 'https://your-domain.atlassian.net/wiki/spaces/...' : 'https://docs.google.com/document/d/...';
+                const label = state.importType === 'confluence' ? 'Confluence Page URL' : 'Google Document URL';
+                
+                importSectionHtml = `
+                    <div class="flex gap-3 items-end p-4 bg-slate-50 rounded-lg border border-slate-200 fade-in mt-4">
+                        <div class="flex-1">
+                            <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wider">${label}</label>
+                            <div class="relative">
+                                <i class="ph-bold ph-link absolute left-3 top-3 text-slate-400"></i>
+                                <input type="url" value="${escapeHTML(state.importUrl)}" oninput="handleImportUrlInput(this.value)" placeholder="${placeholder}" class="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white"/>
+                            </div>
+                        </div>
+                        <button type="button" id="import-btn" onclick="handleImport()" ${!state.importUrl || state.isImporting ? 'disabled' : ''} class="bg-slate-800 hover:bg-slate-900 disabled:bg-slate-400 text-white px-6 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 h-[42px]">
+                            ${state.isImporting ? '<i class="ph-bold ph-spinner animate-spin"></i>' : 'Fetch & Auto-fill'}
+                        </button>
+                    </div>
+                `;
+            }
+
+            const autoBadge = (state.formData.title && state.importType !== 'manual') ? `<span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-bold ml-2">Auto-populated</span>` : '';
+
+            return `
+                <div class="max-w-3xl mx-auto space-y-6 fade-in">
+                    <header class="mb-8">
+                        <h1 class="text-2xl font-bold text-slate-800">New Change Intake</h1>
+                        <p class="text-slate-500">Submit engineering inputs to auto-generate operational workstreams.</p>
+                    </header>
+
+                    <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                        <h2 class="text-sm font-bold text-slate-800 mb-4">How would you like to create this intake?</h2>
+                        <div class="flex flex-col sm:flex-row gap-4">
+                            <button type="button" onclick="setImportType('manual')" class="flex-1 py-3 px-4 rounded-lg border flex items-center justify-center gap-2 font-medium transition-colors ${manualClass}">
+                                <i class="ph-bold ph-list-checks"></i> Manual Entry
+                            </button>
+                            <button type="button" onclick="setImportType('confluence')" class="flex-1 py-3 px-4 rounded-lg border flex items-center justify-center gap-2 font-medium transition-colors ${confClass}">
+                                <i class="ph-bold ph-globe"></i> Confluence URL
+                            </button>
+                            <button type="button" onclick="setImportType('gdocs')" class="flex-1 py-3 px-4 rounded-lg border flex items-center justify-center gap-2 font-medium transition-colors ${docsClass}">
+                                <i class="ph-bold ph-file-text"></i> Google Docs URL
+                            </button>
+                        </div>
+                        ${importSectionHtml}
+                    </div>
+
+                    <form onsubmit="handleFormSubmit(event)" class="bg-white p-8 rounded-xl border border-slate-200 shadow-sm space-y-6">
+                        <div class="flex items-center gap-2 mb-2">
+                            <h2 class="text-lg font-bold text-slate-800">Project Details</h2>
+                            ${autoBadge}
+                        </div>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-semibold text-slate-700 mb-1">Project Title</label>
+                                <input required type="text" value="${escapeHTML(state.formData.title)}" oninput="handleFormInput('title', this.value)" class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="e.g. Q4 Platform Migration" />
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-semibold text-slate-700 mb-1">Target Launch Date</label>
+                                    <input required type="date" value="${escapeHTML(state.formData.timeline)}" oninput="handleFormInput('timeline', this.value)" class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold text-slate-700 mb-1">Risk / Impact Level</label>
+                                    <select oninput="handleFormInput('riskLevel', this.value)" class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                                        <option value="Low" ${state.formData.riskLevel === 'Low' ? 'selected' : ''}>Low (Process tweak)</option>
+                                        <option value="Medium" ${state.formData.riskLevel === 'Medium' ? 'selected' : ''}>Medium (Cross-functional update)</option>
+                                        <option value="High" ${state.formData.riskLevel === 'High' ? 'selected' : ''}>High (Multi-team rollout)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-slate-700 mb-1">Objective</label>
+                                <textarea required rows="2" oninput="handleFormInput('objective', this.value)" class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="What is the business goal?">${escapeHTML(state.formData.objective)}</textarea>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-slate-700 mb-1">Scope & Dependencies</label>
+                                <textarea rows="2" oninput="handleFormInput('scope', this.value)" class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="Who is affected? What other projects does this depend on?">${escapeHTML(state.formData.scope)}</textarea>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-slate-700 mb-1">Technical Summary</label>
+                                <textarea required rows="3" oninput="handleFormInput('techSummary', this.value)" class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="Brief technical overview from Engineering...">${escapeHTML(state.formData.techSummary)}</textarea>
+                            </div>
+                        </div>
+                        <div class="pt-4 border-t border-slate-100 flex justify-end">
+                            <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-medium transition-colors flex items-center gap-2">
+                                <i class="ph-bold ph-rocket"></i> Generate Workstreams
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            `;
+        }
+
+        function renderProjectDetail() {
+            const project = state.projects.find(p => p.id === state.selectedProjectId);
+            if (!project) return '';
+
+            const overall = calculateOverallReadiness(project.tasks);
+            
+            const renderTaskRow = (task, dept) => {
+                const getStatusColor = (status) => {
+                    switch(status) {
+                        case 'Completed': return 'text-green-600 bg-green-50 border-green-200';
+                        case 'In Progress': return 'text-blue-600 bg-blue-50 border-blue-200';
+                        case 'Blocked': return 'text-red-600 bg-red-50 border-red-200';
+                        default: return 'text-gray-600 bg-gray-50 border-gray-200';
+                    }
+                };
+                
+                const getStatusIconHtml = (status) => {
+                    switch(status) {
+                        case 'Completed': return '<i class="ph-fill ph-check-circle text-green-600"></i>';
+                        case 'In Progress': return '<i class="ph-fill ph-clock text-blue-600"></i>';
+                        case 'Blocked': return '<i class="ph-fill ph-x-circle text-red-600"></i>';
+                        default: return '<i class="ph-fill ph-warning-circle text-gray-400"></i>';
+                    }
+                };
+
+                return `
+                    <div class="flex items-center justify-between p-3 hover:bg-slate-50 border-b border-slate-100 last:border-0 transition-colors">
+                        <div class="flex items-center gap-3 w-1/3">
+                            ${getStatusIconHtml(task.status)}
+                            <span class="text-sm font-medium ${task.status === 'Completed' ? 'text-slate-400 line-through' : 'text-slate-700'}">
+                                ${escapeHTML(task.title)}
+                            </span>
+                        </div>
+                        <div class="w-1/4">
+                            <input type="text" placeholder="Assign Owner..." value="${escapeHTML(task.owner)}" onchange="updateTaskDetail('${project.id}', '${dept}', '${task.id}', 'owner', this.value)" class="text-sm bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none w-full px-1"/>
+                        </div>
+                        <div class="w-1/6">
+                            <input type="date" value="${escapeHTML(task.dueDate)}" onchange="updateTaskDetail('${project.id}', '${dept}', '${task.id}', 'dueDate', this.value)" class="text-sm bg-transparent border-none text-slate-500 focus:outline-none"/>
+                        </div>
+                        <div class="w-1/4 flex justify-end">
+                            <select onchange="updateTaskStatus('${project.id}', '${dept}', '${task.id}', this.value)" class="text-xs font-semibold px-2 py-1 rounded-full border focus:outline-none appearance-none cursor-pointer ${getStatusColor(task.status)}">
+                                <option value="Not Started" ${task.status === 'Not Started' ? 'selected' : ''}>Not Started</option>
+                                <option value="In Progress" ${task.status === 'In Progress' ? 'selected' : ''}>In Progress</option>
+                                <option value="Blocked" ${task.status === 'Blocked' ? 'selected' : ''}>Blocked</option>
+                                <option value="Completed" ${task.status === 'Completed' ? 'selected' : ''}>Completed</option>
+                            </select>
+                        </div>
+                    </div>
+                `;
+            };
+
+            const impactClass = project.impactLevel === 'High' ? 'bg-red-50 text-red-700 border-red-200' : 
+                                project.impactLevel === 'Medium' ? 'bg-orange-50 text-orange-700 border-orange-200' : 
+                                'bg-green-50 text-green-700 border-green-200';
+
+            const gateClass = project.approvalGate === 'Go' ? 'bg-emerald-500 text-white hover:bg-emerald-600' : 'bg-slate-200 text-slate-700 hover:bg-slate-300';
+            const gateText = project.approvalGate === 'Go' ? 'GO APPROVED' : 'NO-GO / PENDING';
+
+            return `
+                <div class="space-y-6 fade-in">
+                    <button onclick="navigate('dashboard')" class="text-sm text-indigo-600 hover:text-indigo-800 flex items-center gap-1 font-medium mb-4">
+                        <i class="ph-bold ph-caret-left"></i> Back to Dashboard
+                    </button>
+
+                    <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h1 class="text-2xl font-bold text-slate-900">${escapeHTML(project.title)}</h1>
+                                <p class="text-slate-500 mt-1">${escapeHTML(project.objective)}</p>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-3xl font-bold text-indigo-600">${overall}%</div>
+                                <div class="text-sm text-slate-500 font-medium">Global Readiness</div>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-slate-100 mt-4">
+                            <div>
+                                <p class="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-1">Target Date</p>
+                                <p class="text-sm font-medium text-slate-800">${escapeHTML(project.timeline)}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-1">Impact Level</p>
+                                <span class="px-2 py-0.5 rounded text-xs font-semibold border ${impactClass}">${escapeHTML(project.impactLevel)}</span>
+                            </div>
+                            <div class="flex items-center justify-start md:justify-end gap-3">
+                                <span class="text-sm font-semibold text-slate-700">Launch Gate:</span>
+                                <button onclick="updateApprovalGate('${project.id}')" class="px-4 py-1.5 rounded-lg text-sm font-bold shadow-sm transition-colors ${gateClass}">
+                                    ${gateText}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-6">
+                        <!-- Operations -->
+                        <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                            <div class="bg-slate-50 p-4 border-b border-slate-200 flex justify-between items-center">
+                                <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2"><i class="ph-bold ph-users text-blue-500"></i> Operations Workstream</h2>
+                                <span class="text-sm font-bold text-blue-600 bg-blue-100 px-3 py-1 rounded-full">${calculateReadiness(project.tasks.operations)}% Ready</span>
+                            </div>
+                            <div class="p-2 w-full overflow-x-auto">
+                                <div class="min-w-[600px]">
+                                    <div class="flex text-xs font-semibold text-slate-400 uppercase px-3 py-2">
+                                        <div class="w-1/3">Deliverable</div><div class="w-1/4">Owner</div><div class="w-1/6">Target</div><div class="w-1/4 text-right pr-2">Status</div>
+                                    </div>
+                                    ${project.tasks.operations.map(t => renderTaskRow(t, 'operations')).join('')}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Training -->
+                        <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                            <div class="bg-slate-50 p-4 border-b border-slate-200 flex justify-between items-center">
+                                <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2"><i class="ph-bold ph-book-open text-amber-500"></i> Training Workstream</h2>
+                                <span class="text-sm font-bold text-amber-600 bg-amber-100 px-3 py-1 rounded-full">${calculateReadiness(project.tasks.training)}% Ready</span>
+                            </div>
+                            <div class="p-2 w-full overflow-x-auto">
+                                <div class="min-w-[600px]">
+                                    <div class="flex text-xs font-semibold text-slate-400 uppercase px-3 py-2">
+                                        <div class="w-1/3">Deliverable</div><div class="w-1/4">Owner</div><div class="w-1/6">Target</div><div class="w-1/4 text-right pr-2">Status</div>
+                                    </div>
+                                    ${project.tasks.training.map(t => renderTaskRow(t, 'training')).join('')}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Quality -->
+                        <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                            <div class="bg-slate-50 p-4 border-b border-slate-200 flex justify-between items-center">
+                                <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2"><i class="ph-bold ph-crosshair text-emerald-500"></i> Quality Workstream</h2>
+                                <span class="text-sm font-bold text-emerald-600 bg-emerald-100 px-3 py-1 rounded-full">${calculateReadiness(project.tasks.quality)}% Ready</span>
+                            </div>
+                            <div class="p-2 w-full overflow-x-auto">
+                                <div class="min-w-[600px]">
+                                    <div class="flex text-xs font-semibold text-slate-400 uppercase px-3 py-2">
+                                        <div class="w-1/3">Deliverable</div><div class="w-1/4">Owner</div><div class="w-1/6">Target</div><div class="w-1/4 text-right pr-2">Status</div>
+                                    </div>
+                                    ${project.tasks.quality.map(t => renderTaskRow(t, 'quality')).join('')}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function render() {
+            renderNav();
+            const root = document.getElementById('app-root');
+            if (state.currentView === 'dashboard') root.innerHTML = renderDashboard();
+            else if (state.currentView === 'intake') root.innerHTML = renderIntake();
+            else if (state.currentView === 'project-detail') root.innerHTML = renderProjectDetail();
+        }
+
+        // Initialize App
+        init();
+
+    </script>
+</body>
+</html>
