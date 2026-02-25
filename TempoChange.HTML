@@ -93,6 +93,12 @@
             selectedProjectId: null,
             importType: 'manual',
             isImporting: false,
+            fetchedPRDs: [
+                { id: 'prd-1', title: 'Referral Program 2.0', category: 'Growth & Acquisition', objective: 'Revamp the referral program to offer tiered rewards and increase user acquisition.', scope: 'Mobile app, Marketing emails, Billing platform.', techSummary: 'Update referral code generation logic and webhook listeners for successful conversions.', timeline: '2026-06-15', dependencies: 'Stripe API update', riskLevel: 'Medium' },
+                { id: 'prd-2', title: 'AI Coach V2', category: 'Core Experience', objective: 'Implement AI coaching models into the primary mobile user experience to boost retention.', scope: 'Mobile app exclusively. Requires backend ML support.', techSummary: 'Integrating generative AI endpoints to build custom workout summaries. Dependent on data engineering pipelines.', timeline: '2026-11-01', dependencies: 'ML Model V2, Mobile iOS Release 4.1', riskLevel: 'High' },
+                { id: 'prd-3', title: 'Workout History Export', category: 'Core Experience', objective: 'Allow users to export their workout data to Apple Health and CSV.', scope: 'iOS App and User Web Portal.', techSummary: 'Implement HealthKit integration and a CSV generation microservice.', timeline: '2026-05-20', dependencies: 'None', riskLevel: 'Low' },
+                { id: 'prd-4', title: 'Payment Gateway Migration', category: 'Platform & Infrastructure', objective: 'Migrate core payment processing to Stripe to reduce transaction fees.', scope: 'All NA and EU transactions.', techSummary: 'API swap from LegacyPay to Stripe V3. Requires new webhook handling.', timeline: '2026-08-01', dependencies: 'Finance Team Approval', riskLevel: 'High' }
+            ],
             formData: {
                 title: '', objective: '', scope: '', techSummary: '', timeline: '', dependencies: '', riskLevel: 'Medium'
             },
@@ -108,25 +114,25 @@
 
         const generateMxActions = (impact, type) => {
             let actions = [
-                { task: 'Create Slack channel for internal communication', owner: 'Submitter / Dept Head', time: '5m', status: 'Pending' },
-                { task: 'Announce the change', owner: 'Change Owner', time: '10m', status: 'Pending' },
-                { task: 'Update the Change Communication Tracker', owner: 'Manager', time: '5m', status: 'Pending' }
+                { task: 'Create Slack channel for internal communication', owner: 'Submitter / Dept Head', time: '5m', status: 'Pending', isEditing: false },
+                { task: 'Announce the change', owner: 'Change Owner', time: '10m', status: 'Pending', isEditing: false },
+                { task: 'Update the Change Communication Tracker', owner: 'Manager', time: '5m', status: 'Pending', isEditing: false }
             ];
 
             if (impact === 'Major' || impact === 'Critical') {
-                actions.push({ task: 'Document to outline flows and requirements', owner: 'Change Owner', time: '1h', status: 'Pending' });
-                actions.push({ task: 'Huddle with impacted teams', owner: 'Manager', time: '15m per interval', status: 'Pending' });
-                actions.push({ task: 'Training materials or sessions', owner: 'Training Dept', time: 'TBD', status: 'Pending' });
-                actions.push({ task: 'Testing system workflows & collecting samples', owner: 'QA / Operations', time: 'TBD', status: 'Pending' });
+                actions.push({ task: 'Document to outline flows and requirements', owner: 'Change Owner', time: '1h', status: 'Pending', isEditing: false });
+                actions.push({ task: 'Huddle with impacted teams', owner: 'Manager', time: '15m per interval', status: 'Pending', isEditing: false });
+                actions.push({ task: 'Training materials or sessions', owner: 'Training Dept', time: 'TBD', status: 'Pending', isEditing: false });
+                actions.push({ task: 'Testing system workflows & collecting samples', owner: 'QA / Operations', time: 'TBD', status: 'Pending', isEditing: false });
             }
 
             if (type === 'Workflow') {
                 if (impact === 'Minor') {
-                    actions.push({ task: 'Updating current SOP/s', owner: 'Submitter', time: '10 - 30m per page', status: 'Pending' });
+                    actions.push({ task: 'Updating current SOP/s', owner: 'Submitter', time: '10 - 30m per page', status: 'Pending', isEditing: false });
                 } else {
-                    actions.push({ task: 'Creating a new SOP', owner: 'Operations', time: '30m - 1h', status: 'Pending' });
+                    actions.push({ task: 'Creating a new SOP', owner: 'Operations', time: '30m - 1h', status: 'Pending', isEditing: false });
                 }
-                actions.push({ task: 'QA scorecard modifications', owner: 'Quality', time: '30m', status: 'Pending' });
+                actions.push({ task: 'QA scorecard modifications', owner: 'Quality', time: '30m', status: 'Pending', isEditing: false });
             }
             return actions;
         };
@@ -284,6 +290,10 @@
         window.setImportType = (type) => {
             state.importType = type;
             state.importUrl = '';
+            // Reset form if navigating away from confluence
+            if(type !== 'confluence') {
+                state.formData = { title: '', objective: '', scope: '', techSummary: '', timeline: '', dependencies: '', riskLevel: 'Medium' };
+            }
             render();
         };
 
@@ -294,6 +304,28 @@
         window.handleImportUrlInput = (value) => {
             state.importUrl = value;
             document.getElementById('import-btn').disabled = !value;
+        };
+
+        window.selectPRD = (id) => {
+            const prd = state.fetchedPRDs.find(p => p.id === id);
+            if(prd) {
+                state.formData = {
+                    title: prd.title,
+                    objective: prd.objective,
+                    scope: prd.scope,
+                    techSummary: prd.techSummary,
+                    timeline: prd.timeline,
+                    dependencies: prd.dependencies,
+                    riskLevel: prd.riskLevel
+                };
+                
+                render();
+                
+                // Scroll down to the populated form
+                setTimeout(() => {
+                    document.getElementById('intake-form').scrollIntoView({ behavior: 'smooth' });
+                }, 100);
+            }
         };
 
         window.handleImport = async () => {
@@ -602,9 +634,84 @@
             const docsClass = state.importType === 'gdocs' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50';
             
             let importSectionHtml = '';
-            if (state.importType !== 'manual') {
-                const placeholder = state.importType === 'confluence' ? 'https://your-domain.atlassian.net/wiki/spaces/...' : 'https://docs.google.com/document/d/...';
-                const label = state.importType === 'confluence' ? 'Confluence Page URL' : 'Google Document URL';
+            
+            if (state.importType === 'confluence') {
+                const prdRows = state.fetchedPRDs.map(prd => `
+                    <tr class="border-b border-slate-100 hover:bg-slate-50 transition-colors group">
+                        <td class="py-3 pr-4">
+                            <div class="flex items-center gap-2">
+                                <i class="ph-fill ph-file-text text-blue-500"></i>
+                                <span class="text-sm font-medium text-[#0052CC] hover:underline cursor-pointer" onclick="selectPRD('${prd.id}')">${escapeHTML(prd.title)}</span>
+                            </div>
+                        </td>
+                        <td class="py-3 px-4 text-xs text-[#5E6C84] hidden sm:table-cell">${escapeHTML(prd.category)}</td>
+                        <td class="py-3 px-4 text-xs text-[#5E6C84]">${escapeHTML(prd.timeline)}</td>
+                        <td class="py-3 pl-4 text-right">
+                            <button type="button" onclick="selectPRD('${prd.id}')" class="opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold text-white bg-[#0052CC] hover:bg-[#0047B3] px-3 py-1.5 rounded-md flex items-center gap-1 ml-auto">
+                                <i class="ph-bold ph-magic-wand"></i> Import
+                            </button>
+                        </td>
+                    </tr>
+                `).join('');
+
+                importSectionHtml = `
+                    <div class="mt-6 border border-[#DFE1E6] rounded-lg overflow-hidden flex flex-col md:flex-row h-[450px] bg-white shadow-sm fade-in">
+                        <!-- Confluence Sidebar -->
+                        <div class="w-full md:w-64 bg-[#F4F5F7] border-r border-[#DFE1E6] p-4 overflow-y-auto shrink-0 hidden md:block">
+                            <div class="flex items-center gap-3 mb-6">
+                                <div class="w-8 h-8 rounded bg-gradient-to-br from-blue-500 to-blue-700 text-white flex items-center justify-center text-sm font-bold shadow-sm">P</div>
+                                <div>
+                                    <span class="text-sm font-bold text-[#172B4D] block">Product (PROD)</span>
+                                    <span class="text-[10px] text-[#5E6C84] uppercase tracking-wider font-semibold">Software Project</span>
+                                </div>
+                            </div>
+                            <div class="text-[11px] text-[#5E6C84] font-bold mb-2 uppercase tracking-wider">Pages</div>
+                            <ul class="space-y-0.5 text-sm text-[#42526E] font-medium">
+                                <li class="flex items-center gap-2 py-1.5 px-2 hover:bg-[#EBECF0] rounded cursor-pointer transition-colors"><i class="ph-fill ph-caret-right text-[#A5ADBA]"></i> Product Strategy</li>
+                                <li class="flex items-center gap-2 py-1.5 px-2 bg-[#E6FCFF] text-[#0052CC] rounded cursor-pointer transition-colors"><i class="ph-fill ph-caret-down"></i> PRDs - Product Require...</li>
+                                <ul class="pl-6 space-y-0.5 mt-0.5 border-l border-[#DFE1E6] ml-3">
+                                    ${state.fetchedPRDs.map(prd => `<li onclick="selectPRD('${prd.id}')" class="py-1 px-2 hover:bg-[#EBECF0] rounded cursor-pointer text-[#42526E] text-xs truncate transition-colors">${escapeHTML(prd.title)}</li>`).join('')}
+                                </ul>
+                                <li class="flex items-center gap-2 py-1.5 px-2 hover:bg-[#EBECF0] rounded cursor-pointer transition-colors mt-1"><i class="ph-fill ph-caret-right text-[#A5ADBA]"></i> Meeting Notes</li>
+                                <li class="flex items-center gap-2 py-1.5 px-2 hover:bg-[#EBECF0] rounded cursor-pointer transition-colors"><i class="ph-fill ph-caret-right text-[#A5ADBA]"></i> Retrospectives</li>
+                            </ul>
+                        </div>
+                        <!-- Confluence Main Content -->
+                        <div class="flex-1 p-6 lg:p-8 overflow-y-auto bg-white relative custom-scrollbar">
+                            <div class="flex items-center text-sm text-[#5E6C84] mb-4 gap-2">
+                                <span class="hover:underline cursor-pointer">Pages</span>
+                                <span>/</span>
+                                <span class="hover:underline cursor-pointer">Product (PROD)</span>
+                            </div>
+                            <h2 class="text-2xl font-bold text-[#172B4D] mb-6 flex items-center gap-2">
+                                PRDs - Product Requirement Documents
+                            </h2>
+                            
+                            <div class="prose prose-sm text-[#091E42] max-w-none mb-8">
+                                <p>This page serves as the master directory for all active Product Requirement Documents within the PROD space. Select a PRD to import it directly into the ChangeSync workflow.</p>
+                            </div>
+
+                            <div class="border border-[#DFE1E6] rounded-lg overflow-hidden">
+                                <table class="w-full text-left border-collapse">
+                                    <thead class="bg-[#F4F5F7] border-b border-[#DFE1E6]">
+                                        <tr>
+                                            <th class="py-2.5 px-4 text-xs font-bold text-[#5E6C84] uppercase">Title</th>
+                                            <th class="py-2.5 px-4 text-xs font-bold text-[#5E6C84] uppercase hidden sm:table-cell">Category</th>
+                                            <th class="py-2.5 px-4 text-xs font-bold text-[#5E6C84] uppercase">Target Date</th>
+                                            <th class="py-2.5 px-4 text-xs font-bold text-[#5E6C84] uppercase text-right">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${prdRows}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else if (state.importType === 'gdocs') {
+                const placeholder = 'https://docs.google.com/document/d/...';
+                const label = 'Google Document URL';
                 
                 importSectionHtml = `
                     <div class="flex gap-3 items-end p-4 bg-slate-50 rounded-lg border border-slate-200 fade-in mt-4">
@@ -622,10 +729,10 @@
                 `;
             }
 
-            const autoBadge = (state.formData.title && state.importType !== 'manual') ? `<span class="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full font-bold ml-2 flex items-center gap-1"><i class="ph-fill ph-sparkle"></i> AI Extracted</span>` : '';
+            const autoBadge = (state.formData.title && state.importType === 'confluence') ? `<span class="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full font-bold ml-2 flex items-center gap-1"><i class="ph-fill ph-check-circle"></i> Imported from Confluence</span>` : '';
 
             return `
-                <div class="max-w-3xl mx-auto space-y-6 fade-in">
+                <div class="max-w-4xl mx-auto space-y-6 fade-in pb-10">
                     <header class="mb-8">
                         <h1 class="text-2xl font-bold text-slate-800">New Change Intake</h1>
                         <p class="text-slate-500">Submit engineering inputs to auto-generate operational workstreams.</p>
@@ -638,7 +745,7 @@
                                 <i class="ph-bold ph-list-checks"></i> Manual Entry
                             </button>
                             <button type="button" onclick="setImportType('confluence')" class="flex-1 py-3 px-4 rounded-lg border flex items-center justify-center gap-2 font-medium transition-colors ${confClass}">
-                                <i class="ph-bold ph-globe"></i> Confluence URL
+                                <i class="ph-bold ph-globe"></i> Confluence Sync
                             </button>
                             <button type="button" onclick="setImportType('gdocs')" class="flex-1 py-3 px-4 rounded-lg border flex items-center justify-center gap-2 font-medium transition-colors ${docsClass}">
                                 <i class="ph-bold ph-file-text"></i> Google Docs URL
@@ -647,7 +754,7 @@
                         ${importSectionHtml}
                     </div>
 
-                    <form onsubmit="handleFormSubmit(event)" class="bg-white p-8 rounded-xl border border-slate-200 shadow-sm space-y-6">
+                    <form id="intake-form" onsubmit="handleFormSubmit(event)" class="bg-white p-8 rounded-xl border border-slate-200 shadow-sm space-y-6">
                         <div class="flex items-center gap-2 mb-2">
                             <h2 class="text-lg font-bold text-slate-800">Project Details</h2>
                             ${autoBadge}
