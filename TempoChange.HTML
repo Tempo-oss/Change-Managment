@@ -96,8 +96,73 @@
             formData: {
                 title: '', objective: '', scope: '', techSummary: '', timeline: '', dependencies: '', riskLevel: 'Medium'
             },
-            importUrl: ''
+            importUrl: '',
+            // New State for Internal Changes
+            internalChanges: [],
+            showInternalChangeForm: false,
+            expandedChangeId: null,
+            internalFormData: {
+                title: '', team: 'All Tiers', type: 'Workflow', date: '', submitter: '', description: '', link: '', impact: 'Minor', isCustomerFacing: false
+            }
         };
+
+        const generateMxActions = (impact, type) => {
+            let actions = [
+                { task: 'Create Slack channel for internal communication', owner: 'Submitter / Dept Head', time: '5m', status: 'Pending' },
+                { task: 'Announce the change', owner: 'Change Owner', time: '10m', status: 'Pending' },
+                { task: 'Update the Change Communication Tracker', owner: 'Manager', time: '5m', status: 'Pending' }
+            ];
+
+            if (impact === 'Major' || impact === 'Critical') {
+                actions.push({ task: 'Document to outline flows and requirements', owner: 'Change Owner', time: '1h', status: 'Pending' });
+                actions.push({ task: 'Huddle with impacted teams', owner: 'Manager', time: '15m per interval', status: 'Pending' });
+                actions.push({ task: 'Training materials or sessions', owner: 'Training Dept', time: 'TBD', status: 'Pending' });
+                actions.push({ task: 'Testing system workflows & collecting samples', owner: 'QA / Operations', time: 'TBD', status: 'Pending' });
+            }
+
+            if (type === 'Workflow') {
+                if (impact === 'Minor') {
+                    actions.push({ task: 'Updating current SOP/s', owner: 'Submitter', time: '10 - 30m per page', status: 'Pending' });
+                } else {
+                    actions.push({ task: 'Creating a new SOP', owner: 'Operations', time: '30m - 1h', status: 'Pending' });
+                }
+                actions.push({ task: 'QA scorecard modifications', owner: 'Quality', time: '30m', status: 'Pending' });
+            }
+            return actions;
+        };
+
+        const initialInternalChanges = [
+            {
+                id: 'ic-1', title: 'Start new conversations using Freshchat instead of Follow-Up Emails', team: 'All Tiers', type: 'Workflow', date: '2023-12-27T17:00', submitter: 'Khaled El Sabban', 
+                description: 'We don’t need to make Follow-Up Emails anymore. Now, we can start new conversations using Freshchat (+New conv Feature). All Agents should use this new feature instead of sending Follow-Up Emails. This will reduce the impact of receiving more than one open conversation under the same customer, along with many challenges related to queues automation and snoozing interactions.', 
+                link: 'https://tempofit.atlassian.net/wiki/spaces/CS/pages/904757249/Creating+A+Follow-Up+Email', impact: 'Major', isCustomerFacing: false,
+                actions: generateMxActions('Major', 'Workflow')
+            },
+            {
+                id: 'ic-2', title: 'Update SOP - Holding and Postponing Deliveries', team: 'All Tiers', type: 'Workflow', date: '2024-05-21T00:00', submitter: 'Ahmed Hamed', 
+                description: 'For Pre assigned units, we need to add the extra step of raising the request to T2 Mentors for support. Mentors must notify Logistics team on #Mx-Sc-Studio slack channel.', 
+                link: '', impact: 'Minor', isCustomerFacing: false,
+                actions: generateMxActions('Minor', 'Workflow')
+            },
+            {
+                id: 'ic-3', title: 'Order Confirmation Page', team: 'All Tiers', type: 'System/Tools', date: '2024-09-03T21:00', submitter: 'Mohamed Amin', 
+                description: 'I can see we have outdated delivery information in the order confirmation page that appears to customers, as you see in the attached screenshot.', 
+                link: 'https://shop.tempo.fit/27218149465/orders/3f1110579a98e993c44d69fb1b4ee7b9', impact: 'Critical', isCustomerFacing: true,
+                actions: generateMxActions('Critical', 'System/Tools')
+            },
+            {
+                id: 'ic-4', title: 'Sales SOP for follow ups', team: 'Tier 1', type: 'Workflow', date: '2024-11-27T18:00', submitter: 'Ahmed Elsawy', 
+                description: 'Updating the sales SOP for follow ups to align with new communication strategies.', 
+                link: 'https://docs.google.com/document/d/13hJwCHw6AjU2GXmHjZfQVs68FKnHSttAhKUkr_g3CvI/edit?tab=t.0', impact: 'Minor', isCustomerFacing: false,
+                actions: generateMxActions('Minor', 'Workflow')
+            },
+            {
+                id: 'ic-5', title: 'Upgrade/Downgrade for T1', team: 'Tier 1', type: 'Workflow', date: 'Pending', submitter: 'Heba Elsobky', 
+                description: 'We need to have specific guidelines related to the upgrade and downgrade process, and the steps for each scenario (Pre-shipping, Post-shipping, and Post-delivery)', 
+                link: 'https://tempofit.atlassian.net/wiki/spaces/CS/pages/400328644/How+to+Edit+Order+Upgrade+Downgrade', impact: 'Major', isCustomerFacing: true,
+                actions: generateMxActions('Major', 'Workflow')
+            }
+        ];
 
         const initialProjects = [
             {
@@ -144,6 +209,7 @@
             } else {
                 state.projects = [...initialProjects];
             }
+            state.internalChanges = [...initialInternalChanges];
             render();
         }
 
@@ -330,6 +396,97 @@
             await saveProjectToDB(project);
         };
 
+        // MX Internal Changes Handlers
+        window.toggleInternalChangeForm = (show) => {
+            state.showInternalChangeForm = show;
+            if (!show) {
+                // Reset form
+                state.internalFormData = { title: '', team: 'All Tiers', type: 'Workflow', date: '', submitter: '', description: '', link: '', impact: 'Minor', isCustomerFacing: false };
+            }
+            render();
+        };
+
+        window.handleInternalChangeInput = (field, value) => {
+            state.internalFormData[field] = value;
+        };
+        
+        window.handleInternalChangeCheckbox = (field, checked) => {
+            state.internalFormData[field] = checked;
+        };
+
+        window.toggleInternalChangeDetail = (id) => {
+            state.expandedChangeId = state.expandedChangeId === id ? null : id;
+            render();
+        };
+
+        window.submitInternalChange = (e) => {
+            e.preventDefault();
+            const newChange = {
+                id: `ic-${Date.now()}`,
+                ...state.internalFormData,
+                actions: generateMxActions(state.internalFormData.impact, state.internalFormData.type)
+            };
+            
+            // Unshift to put at the top of the list
+            state.internalChanges.unshift(newChange);
+            
+            // In a real app, you would save this to Supabase here
+            window.toggleInternalChangeForm(false);
+        };
+
+        // Action Plan Edit Handlers
+        window.deleteMxAction = (changeId, actionIndex) => {
+            const change = state.internalChanges.find(c => c.id === changeId);
+            if (change) {
+                change.actions.splice(actionIndex, 1);
+                render();
+            }
+        };
+
+        window.editMxAction = (changeId, actionIndex) => {
+            const change = state.internalChanges.find(c => c.id === changeId);
+            if (change) {
+                change.actions[actionIndex].isEditing = true;
+                render();
+            }
+        };
+
+        window.saveMxAction = (changeId, actionIndex) => {
+            const change = state.internalChanges.find(c => c.id === changeId);
+            if (change) {
+                const taskInput = document.getElementById(`edit-task-${changeId}-${actionIndex}`).value;
+                const ownerInput = document.getElementById(`edit-owner-${changeId}-${actionIndex}`).value;
+                const timeInput = document.getElementById(`edit-time-${changeId}-${actionIndex}`).value;
+                
+                change.actions[actionIndex].task = taskInput;
+                change.actions[actionIndex].owner = ownerInput;
+                change.actions[actionIndex].time = timeInput;
+                change.actions[actionIndex].isEditing = false;
+                render();
+            }
+        };
+
+        window.cancelEditMxAction = (changeId, actionIndex) => {
+            const change = state.internalChanges.find(c => c.id === changeId);
+            if (change) {
+                // If it was a newly added empty task and we cancel, just remove it
+                if (!change.actions[actionIndex].task) {
+                    change.actions.splice(actionIndex, 1);
+                } else {
+                    change.actions[actionIndex].isEditing = false;
+                }
+                render();
+            }
+        };
+
+        window.addMxAction = (changeId) => {
+            const change = state.internalChanges.find(c => c.id === changeId);
+            if (change) {
+                change.actions.push({ task: '', owner: '', time: '', status: 'Pending', isEditing: true });
+                render();
+            }
+        };
+
         // ==========================================
         // RENDERING LOGIC
         // ==========================================
@@ -341,7 +498,10 @@
                     <i class="ph ph-squares-four text-lg"></i> Dashboard
                 </button>
                 <button onclick="navigate('intake')" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${state.currentView === 'intake' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800 hover:text-white'}">
-                    <i class="ph ph-folder-plus text-lg"></i> New Intake
+                    <i class="ph ph-folder-plus text-lg"></i> Engineering Intake
+                </button>
+                <button onclick="navigate('internal-changes')" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${state.currentView === 'internal-changes' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800 hover:text-white'}">
+                    <i class="ph ph-swap text-lg"></i> MX Changes
                 </button>
                 <button class="w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors hover:bg-slate-800 hover:text-white opacity-50 cursor-not-allowed" title="Coming Soon">
                     <i class="ph ph-gear text-lg"></i> Configurations
@@ -681,11 +841,223 @@
             `;
         }
 
+        function renderInternalChanges() {
+            if (state.showInternalChangeForm) {
+                return `
+                    <div class="max-w-3xl mx-auto space-y-6 fade-in">
+                        <button onclick="toggleInternalChangeForm(false)" class="text-sm text-indigo-600 hover:text-indigo-800 flex items-center gap-1 font-medium mb-4">
+                            <i class="ph-bold ph-caret-left"></i> Back to MX Changes
+                        </button>
+                        
+                        <header class="mb-8">
+                            <h1 class="text-2xl font-bold text-slate-800">Change Management Form - MX</h1>
+                            <p class="text-slate-500">Submit an internal process, workflow, or tooling change.</p>
+                        </header>
+
+                        <form onsubmit="submitInternalChange(event)" class="bg-white p-8 rounded-xl border border-slate-200 shadow-sm space-y-6">
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-semibold text-slate-700 mb-1">What is the change required?</label>
+                                    <input required type="text" value="${escapeHTML(state.internalFormData.title)}" oninput="handleInternalChangeInput('title', this.value)" class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="Brief title of the change" />
+                                </div>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm font-semibold text-slate-700 mb-1">Which Team is impacted?</label>
+                                        <select oninput="handleInternalChangeInput('team', this.value)" class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                                            <option value="All Tiers" ${state.internalFormData.team === 'All Tiers' ? 'selected' : ''}>All Tiers</option>
+                                            <option value="Tier 1" ${state.internalFormData.team === 'Tier 1' ? 'selected' : ''}>Tier 1</option>
+                                            <option value="Tier 2" ${state.internalFormData.team === 'Tier 2' ? 'selected' : ''}>Tier 2</option>
+                                            <option value="Mentors/Leads" ${state.internalFormData.team === 'Mentors/Leads' ? 'selected' : ''}>Mentors / Leads</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-semibold text-slate-700 mb-1">System/Tools or Workflow?</label>
+                                        <select oninput="handleInternalChangeInput('type', this.value)" class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                                            <option value="Workflow" ${state.internalFormData.type === 'Workflow' ? 'selected' : ''}>Workflow</option>
+                                            <option value="System/Tools" ${state.internalFormData.type === 'System/Tools' ? 'selected' : ''}>System / Tools</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-semibold text-slate-700 mb-1">When is this going to happen?</label>
+                                        <input required type="datetime-local" value="${escapeHTML(state.internalFormData.date)}" oninput="handleInternalChangeInput('date', this.value)" class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-semibold text-slate-700 mb-1">Submitter Name</label>
+                                        <input required type="text" value="${escapeHTML(state.internalFormData.submitter)}" oninput="handleInternalChangeInput('submitter', this.value)" class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="Your name"/>
+                                    </div>
+                                </div>
+                                
+                                <div class="p-4 bg-slate-50 border border-slate-200 rounded-lg">
+                                    <label class="block text-sm font-semibold text-slate-700 mb-1">Size of Impact</label>
+                                    <select oninput="handleInternalChangeInput('impact', this.value)" class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none mb-2">
+                                        <option value="Minor" ${state.internalFormData.impact === 'Minor' ? 'selected' : ''}>Minor (SOP wordings, minor steps)</option>
+                                        <option value="Major" ${state.internalFormData.impact === 'Major' ? 'selected' : ''}>Major (Tool changes, workflow shifts, discounts)</option>
+                                        <option value="Critical" ${state.internalFormData.impact === 'Critical' ? 'selected' : ''}>Critical (Urgent, ToS updates, Product releases)</option>
+                                    </select>
+                                    
+                                    <label class="flex items-center gap-2 mt-3 cursor-pointer">
+                                        <input type="checkbox" onchange="handleInternalChangeCheckbox('isCustomerFacing', this.checked)" ${state.internalFormData.isCustomerFacing ? 'checked' : ''} class="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500">
+                                        <span class="text-sm font-semibold text-slate-700">Customer Facing Impact (Website, Marketing, Policy)</span>
+                                    </label>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-semibold text-slate-700 mb-1">Describe the change and Customer Impact</label>
+                                    <textarea required rows="3" oninput="handleInternalChangeInput('description', this.value)" class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none">${escapeHTML(state.internalFormData.description)}</textarea>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold text-slate-700 mb-1">Links / Documents / Screenshots URLs</label>
+                                    <input type="url" value="${escapeHTML(state.internalFormData.link)}" oninput="handleInternalChangeInput('link', this.value)" class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="https://..." />
+                                </div>
+                            </div>
+                            <div class="pt-4 border-t border-slate-100 flex justify-end">
+                                <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-medium transition-colors flex items-center gap-2">
+                                    <i class="ph-bold ph-paper-plane-tilt"></i> Submit Change
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                `;
+            }
+
+            // List View
+            const listHtml = state.internalChanges.map(change => {
+                const isExpanded = state.expandedChangeId === change.id;
+                
+                const impactClass = change.impact === 'Critical' ? 'bg-red-100 text-red-800' : 
+                                    change.impact === 'Major' ? 'bg-orange-100 text-orange-800' : 'bg-green-100 text-green-800';
+
+                let formattedDate = change.date;
+                try { 
+                    if(change.date && change.date !== 'Pending') {
+                        formattedDate = new Date(change.date).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }); 
+                    }
+                } catch(e) {}
+
+                const actionsHtml = change.actions.map((a, index) => {
+                    if (a.isEditing) {
+                        return `
+                            <div class="flex flex-col gap-2 py-3 border-b border-slate-100 last:border-0 bg-slate-50 p-3 rounded-lg animate-fadeIn">
+                                <input type="text" id="edit-task-${change.id}-${index}" value="${escapeHTML(a.task)}" class="w-full p-2 text-sm border border-slate-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Task description..." />
+                                <div class="flex gap-2">
+                                    <div class="w-1/2">
+                                        <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Owner</label>
+                                        <input type="text" id="edit-owner-${change.id}-${index}" value="${escapeHTML(a.owner)}" class="w-full p-2 text-xs border border-slate-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="e.g. Change Owner" />
+                                    </div>
+                                    <div class="w-1/2">
+                                        <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Time/Duration</label>
+                                        <input type="text" id="edit-time-${change.id}-${index}" value="${escapeHTML(a.time)}" class="w-full p-2 text-xs border border-slate-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="e.g. 15m" />
+                                    </div>
+                                </div>
+                                <div class="flex justify-end gap-2 mt-2">
+                                    <button type="button" onclick="cancelEditMxAction('${change.id}', ${index})" class="text-xs px-3 py-1.5 text-slate-600 font-medium hover:bg-slate-200 rounded transition-colors">Cancel</button>
+                                    <button type="button" onclick="saveMxAction('${change.id}', ${index})" class="text-xs px-3 py-1.5 bg-indigo-600 text-white font-medium rounded hover:bg-indigo-700 transition-colors">Save Task</button>
+                                </div>
+                            </div>
+                        `;
+                    }
+
+                    return `
+                        <div class="flex items-start gap-3 py-3 border-b border-slate-100 last:border-0 group relative">
+                            <input type="checkbox" class="mt-1 border-slate-300 text-indigo-600 rounded focus:ring-indigo-500 cursor-pointer">
+                            <div class="flex-1">
+                                <p class="text-sm font-medium text-slate-800">${escapeHTML(a.task)}</p>
+                                <p class="text-xs text-slate-500 mt-0.5">Owner: ${escapeHTML(a.owner)} • Avg Time: ${escapeHTML(a.time)}</p>
+                            </div>
+                            <div class="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                                <button onclick="editMxAction('${change.id}', ${index})" class="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors" title="Edit">
+                                    <i class="ph-bold ph-pencil-simple"></i>
+                                </button>
+                                <button onclick="deleteMxAction('${change.id}', ${index})" class="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors" title="Delete">
+                                    <i class="ph-bold ph-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+                const expandedHtml = isExpanded ? `
+                    <div class="mt-4 pt-4 border-t border-slate-100 animate-fadeIn">
+                        <div class="mb-4">
+                            <h4 class="text-xs font-bold uppercase text-slate-400 mb-1">Description</h4>
+                            <p class="text-sm text-slate-700 bg-slate-50 p-3 rounded-lg border border-slate-200">${escapeHTML(change.description)}</p>
+                        </div>
+                        ${change.link ? `
+                        <div class="mb-6">
+                            <h4 class="text-xs font-bold uppercase text-slate-400 mb-1">Attachments / Links</h4>
+                            <a href="${escapeHTML(change.link)}" target="_blank" class="text-sm text-indigo-600 hover:underline flex items-center gap-1"><i class="ph ph-link"></i> External Reference Link</a>
+                        </div>` : ''}
+                        
+                        <div>
+                            <div class="flex items-center gap-2 mb-2">
+                                <h4 class="text-sm font-bold text-slate-800"><i class="ph-fill ph-list-checks text-indigo-500"></i> Auto-Generated Change Plan</h4>
+                                <span class="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-semibold uppercase tracking-wider">Based on ${change.impact} Impact</span>
+                            </div>
+                            <div class="bg-white border border-slate-200 rounded-lg p-3">
+                                ${actionsHtml}
+                                <button onclick="addMxAction('${change.id}')" class="mt-2 w-full py-2 border-2 border-dashed border-slate-200 text-slate-500 rounded-lg text-sm font-medium hover:bg-slate-50 hover:border-indigo-300 hover:text-indigo-600 transition-colors flex items-center justify-center gap-2">
+                                    <i class="ph-bold ph-plus"></i> Add Action Item
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                ` : '';
+
+                return `
+                    <div class="p-5 border-b border-slate-200 last:border-0 hover:bg-slate-50 transition-colors">
+                        <div class="flex items-start justify-between cursor-pointer" onclick="toggleInternalChangeDetail('${change.id}')">
+                            <div class="flex-1 pr-4">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="px-2 py-0.5 text-xs font-bold rounded ${impactClass}">${escapeHTML(change.impact)}</span>
+                                    ${change.isCustomerFacing ? '<span class="px-2 py-0.5 text-xs font-bold rounded bg-purple-100 text-purple-800 flex items-center gap-1"><i class="ph-fill ph-users"></i> Customer Facing</span>' : ''}
+                                    <span class="text-xs font-semibold text-slate-500 border border-slate-200 px-2 py-0.5 rounded">${escapeHTML(change.type)}</span>
+                                </div>
+                                <h3 class="text-lg font-bold text-indigo-900">${escapeHTML(change.title)}</h3>
+                                <p class="text-sm text-slate-500 mt-1 flex items-center gap-4">
+                                    <span><i class="ph ph-user"></i> ${escapeHTML(change.submitter)}</span>
+                                    <span><i class="ph ph-calendar"></i> ${escapeHTML(formattedDate)}</span>
+                                    <span><i class="ph ph-users-three"></i> ${escapeHTML(change.team)}</span>
+                                </p>
+                            </div>
+                            <div class="text-slate-400 mt-2">
+                                <i class="ph-bold ${isExpanded ? 'ph-caret-up' : 'ph-caret-down'} text-xl"></i>
+                            </div>
+                        </div>
+                        ${expandedHtml}
+                    </div>
+                `;
+            }).join('');
+
+            return `
+                <div class="space-y-6 fade-in">
+                    <header class="mb-8 flex justify-between items-end">
+                        <div>
+                            <h1 class="text-2xl font-bold text-slate-800">MX Change Management Hub</h1>
+                            <p class="text-slate-500">Track internal workflows, tools, and SOP updates.</p>
+                        </div>
+                        <button onclick="toggleInternalChangeForm(true)" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2">
+                            <i class="ph-bold ph-plus"></i> New MX Change
+                        </button>
+                    </header>
+
+                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="p-4 border-b border-slate-200 bg-slate-50">
+                            <h2 class="text-sm font-bold text-slate-800">Recent Internal Changes</h2>
+                        </div>
+                        <div class="divide-y divide-slate-100">
+                            ${state.internalChanges.length > 0 ? listHtml : '<div class="p-8 text-center text-slate-500">No internal changes recorded.</div>'}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
         function render() {
             renderNav();
             const root = document.getElementById('app-root');
             if (state.currentView === 'dashboard') root.innerHTML = renderDashboard();
             else if (state.currentView === 'intake') root.innerHTML = renderIntake();
+            else if (state.currentView === 'internal-changes') root.innerHTML = renderInternalChanges();
             else if (state.currentView === 'project-detail') root.innerHTML = renderProjectDetail();
         }
 
