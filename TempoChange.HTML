@@ -377,49 +377,80 @@
             document.getElementById('import-btn').disabled = !value;
         };
 
+        const callOpenAIAPI = async (promptText) => {
+            const apiKey = "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"; 
+            const url = "https://api.openai.com/v1/chat/completions";
+            
+            const payload = {
+                model: "gpt-4o",
+                response_format: { type: "json_object" },
+                messages: [
+                    {
+                        role: "system",
+                        content: `You are an expert technical project manager. Extract project intake details from the provided text into a JSON object. Return ONLY a valid JSON object with the following string properties: title, objective, scope, techSummary, dependencies, timeline (format YYYY-MM-DD), riskLevel (choose from Low, Medium, High). If the input is a URL, summarize what you can based on the structure.`
+                    },
+                    {
+                        role: "user",
+                        content: promptText
+                    }
+                ]
+            };
+
+            let delay = 1000;
+            for (let i = 0; i < 5; i++) {
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${apiKey}`
+                        },
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    if (!response.ok) {
+                        const err = await response.json();
+                        throw new Error(`OpenAI API Error: ${err.error?.message || response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    const textOutput = data.choices?.[0]?.message?.content;
+                    if (!textOutput) throw new Error("No text in response");
+                    return JSON.parse(textOutput);
+                } catch (e) {
+                    if (i === 4) throw e;
+                    console.warn("Retrying OpenAI call...", e);
+                    await new Promise(res => setTimeout(res, delay));
+                    delay *= 2; // Exponential backoff
+                }
+            }
+        };
+
         window.handleImport = async () => {
             if (!state.importUrl) return;
             state.isImporting = true;
             render();
             
             try {
-                if (isConnectedToSupabase) {
-                    console.log("Calling Edge Function with URL:", state.importUrl);
-                    
-                    // Call the real Supabase Edge Function
-                    const { data, error } = await supabaseClient.functions.invoke('import-doc', {
-                        body: { url: state.importUrl, type: state.importType }
-                    });
+                const promptText = `Analyze the following document text or URL and extract the engineering intake details.\n\nInput Payload:\n${state.importUrl}`;
+                
+                // Call the live OpenAI Model
+                const extractedData = await callOpenAIAPI(promptText);
 
-                    console.log("Edge Function Response:", { data, error });
-
-                    if (error) {
-                        throw new Error(error.message || "Supabase invocation failed");
-                    }
-
-                    if (data && data.success) {
-                        // Merge the parsed data with our form data
-                        state.formData = {
-                            ...state.formData,
-                            title: data.parsed.title || '',
-                            objective: data.parsed.objective || '',
-                            scope: data.parsed.scope || '',
-                            techSummary: data.parsed.techSummary || '',
-                            dependencies: data.parsed.dependencies || '',
-                        };
-                    } else if (data && !data.success) {
-                        // This will catch explicit errors from our Edge Function
-                        throw new Error(data.error || "Unknown error from backend");
-                    } else {
-                        throw new Error("No data returned from backend");
-                    }
-                } else {
-                    throw new Error("Supabase is not connected.");
-                }
+                state.formData = {
+                    ...state.formData,
+                    title: extractedData.title || '',
+                    objective: extractedData.objective || '',
+                    scope: extractedData.scope || '',
+                    techSummary: extractedData.techSummary || '',
+                    dependencies: extractedData.dependencies || '',
+                    timeline: extractedData.timeline || state.formData.timeline,
+                    riskLevel: ['Low', 'Medium', 'High'].includes(extractedData.riskLevel) ? extractedData.riskLevel : 'Medium'
+                };
+                
             } catch (err) {
                 console.error("Failed to import document:", err);
-                // Better error alert so we can see exactly what failed
-                alert("Import Failed: " + err.message);
+                alert("AI Extraction Failed: " + err.message);
             } finally {
                 state.isImporting = false;
                 state.importUrl = '';
@@ -689,20 +720,20 @@
             
             if (state.importType === 'confluence' || state.importType === 'gdocs') {
                 const isConf = state.importType === 'confluence';
-                const placeholder = isConf ? 'https://confluence.yourcompany.com/pages/...' : 'https://docs.google.com/document/d/...';
-                const label = isConf ? 'Confluence Page URL' : 'Google Document URL';
+                const placeholder = isConf ? 'Paste Confluence document text or URL here...' : 'Paste Google Doc text or URL here...';
+                const label = isConf ? 'Confluence Content or URL' : 'Google Doc Content or URL';
                 
                 importSectionHtml = `
-                    <div class="flex flex-col md:flex-row gap-3 items-end p-4 bg-slate-50 rounded-lg border border-slate-200 fade-in mt-4">
-                        <div class="flex-1 w-full">
+                    <div class="flex flex-col gap-3 items-end p-4 bg-slate-50 rounded-lg border border-slate-200 fade-in mt-4">
+                        <div class="w-full">
                             <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wider">${label}</label>
                             <div class="relative">
-                                <i class="ph-bold ph-link absolute left-3 top-3 text-slate-400"></i>
-                                <input type="url" value="${escapeHTML(state.importUrl)}" oninput="handleImportUrlInput(this.value)" placeholder="${placeholder}" class="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white"/>
+                                <textarea rows="5" oninput="handleImportUrlInput(this.value)" placeholder="${placeholder}" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white custom-scrollbar">${escapeHTML(state.importUrl)}</textarea>
                             </div>
+                            <p class="text-[10px] text-slate-400 mt-1"><i class="ph-fill ph-info"></i> For private company documents, please copy and paste the raw text content. URLs only work if publicly accessible.</p>
                         </div>
                         <button type="button" id="import-btn" onclick="handleImport()" ${!state.importUrl || state.isImporting ? 'disabled' : ''} class="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-400 text-white px-6 py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 h-[42px] min-w-[180px]">
-                            ${state.isImporting ? '<i class="ph-bold ph-spinner animate-spin"></i> Analyzing with AI...' : '<i class="ph-bold ph-magic-wand"></i> AI Fetch & Auto-fill'}
+                            ${state.isImporting ? '<i class="ph-bold ph-spinner animate-spin"></i> AI Analyzing...' : '<i class="ph-bold ph-magic-wand"></i> AI Fetch & Auto-fill'}
                         </button>
                     </div>
                 `;
