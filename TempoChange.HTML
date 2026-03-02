@@ -113,6 +113,7 @@
             // Timeline Dashboard State
             selectedDeptTimeline: 'Operations',
             showAddTaskForm: false,
+            editingTaskId: null,
             newTaskFormData: { task: '', owner: '', status: 'Not Started', priority: 'P2', startDate: '', endDate: '', notes: '' },
             departmentTasks: [
                 { id: 'dt-1', dept: 'Operations', task: 'Team Leads: Daily workflow and tasks "Document"', owner: 'Khaled El Sabban', status: 'In Progress', priority: 'P0', startDate: '2026-02-16', endDate: '2026-03-01', notes: 'Document in progress as guide for the daily responsibility per TL' },
@@ -323,6 +324,39 @@
             };
             state.departmentTasks.push(newTask);
             window.toggleAddTaskForm(false);
+        };
+
+        window.editDeptTask = (taskId) => {
+            state.editingTaskId = taskId;
+            render();
+        };
+
+        window.cancelEditDeptTask = () => {
+            state.editingTaskId = null;
+            render();
+        };
+
+        window.saveDeptTask = (e, taskId) => {
+            e.preventDefault();
+            const form = e.target;
+            const task = state.departmentTasks.find(t => t.id === taskId);
+            if (task) {
+                task.task = form.task.value;
+                task.owner = form.owner.value;
+                task.priority = form.priority.value;
+                task.status = form.status.value;
+                task.startDate = form.startDate.value;
+                task.endDate = form.endDate.value;
+                task.notes = form.notes.value;
+            }
+            state.editingTaskId = null;
+            render();
+        };
+
+        window.deleteDeptTask = (taskId) => {
+            // Directly remove the task without native confirm dialogue to avoid iframe blocking issues
+            state.departmentTasks = state.departmentTasks.filter(t => t.id !== taskId);
+            render();
         };
 
         window.openProject = (id) => {
@@ -1320,13 +1354,14 @@
 
                     return `
                         <div class="relative h-6 mb-2 group">
-                            <div class="absolute h-full rounded border ${colorClass} transition-all hover:brightness-110 flex items-center px-2 shadow-sm text-[10px] text-white font-bold truncate cursor-pointer z-10" style="left: ${left}%; width: ${width}%;">
+                            <div onclick="editDeptTask('${task.id}'); document.getElementById('task-row-${task.id}').scrollIntoView({behavior: 'smooth', block: 'center'});" class="absolute h-full rounded border ${colorClass} transition-all hover:brightness-110 flex items-center px-2 shadow-sm text-[10px] text-white font-bold truncate cursor-pointer z-10 hover:ring-2 ring-white" style="left: ${left}%; width: ${width}%;" title="Click to Edit">
                                 ${escapeHTML(task.task)}
                             </div>
                             <div class="hidden group-hover:block absolute z-20 bottom-full mb-1 bg-slate-900 text-white text-xs p-2 rounded whitespace-nowrap shadow-lg" style="left: ${left}%;">
                                 <strong class="block text-indigo-200">${escapeHTML(task.task)}</strong>
                                 ${task.startDate} &rarr; ${task.endDate || '(Estimated)'}<br>
-                                Owner: ${escapeHTML(task.owner)}
+                                Owner: ${escapeHTML(task.owner)}<br>
+                                <span class="text-indigo-300 italic">Click bar to edit</span>
                             </div>
                         </div>
                     `;
@@ -1355,11 +1390,66 @@
             }
 
             const taskRows = currentTasks.length > 0 ? currentTasks.map(task => {
+                if (state.editingTaskId === task.id) {
+                    // Render Inline Edit Form
+                    return `
+                        <div class="p-4 border-b border-slate-100 bg-indigo-50/50">
+                            <form onsubmit="saveDeptTask(event, '${task.id}')" class="space-y-3">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div class="col-span-1 md:col-span-2">
+                                        <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Task Title</label>
+                                        <input type="text" name="task" required value="${escapeHTML(task.task)}" class="w-full p-2 text-sm border border-slate-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Owner</label>
+                                        <input type="text" name="owner" required value="${escapeHTML(task.owner)}" class="w-full p-2 text-sm border border-slate-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <div>
+                                            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Priority</label>
+                                            <select name="priority" class="w-full p-2 text-sm border border-slate-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none">
+                                                <option value="P0" ${task.priority === 'P0' ? 'selected' : ''}>P0</option>
+                                                <option value="P1" ${task.priority === 'P1' ? 'selected' : ''}>P1</option>
+                                                <option value="P2" ${task.priority === 'P2' ? 'selected' : ''}>P2</option>
+                                                <option value="P3" ${task.priority === 'P3' ? 'selected' : ''}>P3</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Status</label>
+                                            <select name="status" class="w-full p-2 text-sm border border-slate-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none">
+                                                <option value="Not Started" ${task.status === 'Not Started' ? 'selected' : ''}>Not Started</option>
+                                                <option value="In Progress" ${task.status === 'In Progress' ? 'selected' : ''}>In Progress</option>
+                                                <option value="Completed" ${task.status === 'Completed' ? 'selected' : ''}>Completed</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Start Date</label>
+                                        <input type="date" name="startDate" value="${escapeHTML(task.startDate)}" class="w-full p-2 text-sm border border-slate-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">End Date</label>
+                                        <input type="date" name="endDate" value="${escapeHTML(task.endDate)}" class="w-full p-2 text-sm border border-slate-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                    </div>
+                                    <div class="col-span-1 md:col-span-2">
+                                        <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Notes / Description</label>
+                                        <textarea name="notes" rows="2" class="w-full p-2 text-sm border border-slate-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none">${escapeHTML(task.notes)}</textarea>
+                                    </div>
+                                </div>
+                                <div class="flex justify-end gap-2 pt-2">
+                                    <button type="button" onclick="cancelEditDeptTask()" class="px-4 py-1.5 text-sm text-slate-600 font-medium hover:bg-slate-200 rounded transition-colors">Cancel</button>
+                                    <button type="submit" class="px-4 py-1.5 text-sm bg-indigo-600 text-white font-medium rounded hover:bg-indigo-700 transition-colors">Save Changes</button>
+                                </div>
+                            </form>
+                        </div>
+                    `;
+                }
+
                 const startStr = task.startDate ? new Date(task.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '--';
                 const endStr = task.endDate ? new Date(task.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '--';
                 
                 return `
-                    <div class="p-4 border-b border-slate-100 hover:bg-slate-50 transition-colors flex flex-col md:flex-row gap-4 items-start md:items-center">
+                    <div id="task-row-${task.id}" class="p-4 border-b border-slate-100 hover:bg-slate-50 transition-colors flex flex-col md:flex-row gap-4 items-start md:items-center group">
                         <div class="flex-1 min-w-[300px]">
                             <div class="flex items-center gap-2 mb-1">
                                 ${getPriorityBadge(task.priority)}
@@ -1379,8 +1469,16 @@
                                 <i class="ph-bold ph-calendar-blank text-slate-400"></i> ${startStr} <i class="ph-bold ph-arrow-right text-slate-400"></i> ${endStr}
                             </div>
                         </div>
-                        <div class="w-full md:w-24 text-right">
+                        <div class="w-full md:w-28 flex flex-col items-end justify-center gap-2">
                             ${getStatusBadge(task.status)}
+                            <div class="flex items-center gap-1.5 mt-1">
+                                <button onclick="editDeptTask('${task.id}')" class="p-1.5 text-slate-600 bg-slate-100 border border-slate-200 hover:text-indigo-600 hover:bg-indigo-50 hover:border-indigo-200 rounded transition-colors" title="Edit Task">
+                                    <i class="ph-bold ph-pencil-simple"></i>
+                                </button>
+                                <button onclick="deleteDeptTask('${task.id}')" class="p-1.5 text-slate-600 bg-slate-100 border border-slate-200 hover:text-red-600 hover:bg-red-50 hover:border-red-200 rounded transition-colors" title="Delete Task">
+                                    <i class="ph-bold ph-trash"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 `;
