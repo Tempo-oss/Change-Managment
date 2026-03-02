@@ -109,7 +109,22 @@
             expandedChangeId: null,
             internalFormData: {
                 title: '', team: 'All Tiers', type: 'Workflow', date: '', submitter: '', description: '', link: '', impact: 'Minor', isCustomerFacing: false
-            }
+            },
+            // Timeline Dashboard State
+            selectedDeptTimeline: 'Operations',
+            showAddTaskForm: false,
+            newTaskFormData: { task: '', owner: '', status: 'Not Started', priority: 'P2', startDate: '', endDate: '', notes: '' },
+            departmentTasks: [
+                { id: 'dt-1', dept: 'Operations', task: 'Team Leads: Daily workflow and tasks "Document"', owner: 'Khaled El Sabban', status: 'In Progress', priority: 'P0', startDate: '2026-02-16', endDate: '2026-03-01', notes: 'Document in progress as guide for the daily responsibility per TL' },
+                { id: 'dt-2', dept: 'Operations', task: 'Tech tool by Pepsi', owner: 'Khaled El Sabban', status: 'Not Started', priority: 'P0', startDate: '2026-02-17', endDate: '', notes: 'Either Pepsi or Eng to finalize the simulator of the Tempo App & Studio OS' },
+                { id: 'dt-3', dept: 'Operations', task: 'Finalizing the Lead req position (Int/Ext)', owner: 'Khaled El Sabban', status: 'Not Started', priority: 'P2', startDate: '2026-03-01', endDate: '', notes: 'Confirming if extra TL is required to start the process (Internal & external) - Confirmation needed by Nancy Sharouny. 1st priority: External Sales lead required.' },
+                { id: 'dt-4', dept: 'Operations', task: 'Extra Head in SME Role', owner: 'Khaled El Sabban', status: 'Not Started', priority: 'P2', startDate: '2026-03-01', endDate: '', notes: 'We will need an extra SME to be able to cover the majority of the day/Shifts and extra support would be needed' },
+                { id: 'dt-5', dept: 'Operations', task: 'Extra head for the Social Media team', owner: 'Khaled El Sabban', status: 'Not Started', priority: 'P2', startDate: '2026-03-01', endDate: '', notes: 'We will need an extra social media agent to be able to cover the majority of the day' },
+                { id: 'dt-6', dept: 'Operations', task: 'Floor Studio status (Pepsi)', owner: 'Khaled El Sabban', status: 'Not Started', priority: 'P3', startDate: '2026-03-15', endDate: '', notes: 'Logistics and ETA' },
+                { id: 'dt-7', dept: 'Operations', task: 'Second screen for agents', owner: 'IT/Ops Support', status: 'Not Started', priority: 'P2', startDate: '', endDate: '', notes: 'Requirement for WFH / Hardware' },
+                { id: 'dt-8', dept: 'Training', task: 'Delivering Business Awareness sessions', owner: 'Menna Yasser', status: 'In Progress', priority: 'P1', startDate: '', endDate: '', notes: '' },
+                { id: 'dt-9', dept: 'Training', task: 'Finalize Trainer’s off class utilization sheet', owner: 'Menna Yasser', status: 'Completed', priority: 'P1', startDate: '', endDate: '', notes: '' }
+            ]
         };
 
         const generateMxActions = (impact, type) => {
@@ -280,6 +295,34 @@
         window.navigate = (view) => {
             state.currentView = view;
             render();
+        };
+
+        window.setTimelineDept = (dept) => {
+            state.selectedDeptTimeline = dept;
+            render();
+        };
+
+        window.toggleAddTaskForm = (show) => {
+            state.showAddTaskForm = show;
+            if (!show) {
+                state.newTaskFormData = { task: '', owner: '', status: 'Not Started', priority: 'P2', startDate: '', endDate: '', notes: '' };
+            }
+            render();
+        };
+
+        window.handleNewTaskInput = (field, value) => {
+            state.newTaskFormData[field] = value;
+        };
+
+        window.submitNewTask = (e) => {
+            e.preventDefault();
+            const newTask = {
+                id: `dt-${Date.now()}`,
+                dept: state.selectedDeptTimeline,
+                ...state.newTaskFormData
+            };
+            state.departmentTasks.push(newTask);
+            window.toggleAddTaskForm(false);
         };
 
         window.openProject = (id) => {
@@ -528,6 +571,9 @@
             nav.innerHTML = `
                 <button onclick="navigate('dashboard')" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${state.currentView === 'dashboard' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800 hover:text-white'}">
                     <i class="ph ph-squares-four text-lg"></i> Dashboard
+                </button>
+                <button onclick="navigate('timeline')" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${state.currentView === 'timeline' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800 hover:text-white'}">
+                    <i class="ph ph-calendar-check text-lg"></i> Dept Timelines
                 </button>
                 <button onclick="navigate('intake')" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${state.currentView === 'intake' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800 hover:text-white'}">
                     <i class="ph ph-folder-plus text-lg"></i> Engineering Intake
@@ -1159,10 +1205,237 @@
             `;
         }
 
+        function renderTimeline() {
+            const depts = ['Operations', 'Change Integration', 'Training', 'QA', 'WFM'];
+            
+            const tabsHtml = depts.map(dept => `
+                <button onclick="setTimelineDept('${dept}')" class="px-4 py-2 text-sm font-bold rounded-lg transition-colors whitespace-nowrap ${state.selectedDeptTimeline === dept ? 'bg-indigo-100 text-indigo-700' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'}">
+                    ${dept}
+                </button>
+            `).join('');
+
+            const currentTasks = state.departmentTasks.filter(t => t.dept === state.selectedDeptTimeline);
+            
+            const getStatusBadge = (status) => {
+                switch(status) {
+                    case 'Completed': return '<span class="px-2 py-1 bg-green-100 text-green-700 rounded text-[10px] font-bold uppercase tracking-wider"><i class="ph-bold ph-check"></i> Done</span>';
+                    case 'In Progress': return '<span class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-[10px] font-bold uppercase tracking-wider"><i class="ph-bold ph-spinner-gap animate-spin"></i> Active</span>';
+                    default: return '<span class="px-2 py-1 bg-slate-100 text-slate-600 rounded text-[10px] font-bold uppercase tracking-wider">Pending</span>';
+                }
+            };
+
+            const getPriorityBadge = (prio) => {
+                if(prio === 'P0') return '<span class="text-red-600 font-bold text-xs bg-red-50 px-2 py-0.5 rounded border border-red-200">P0</span>';
+                if(prio === 'P1') return '<span class="text-orange-600 font-bold text-xs bg-orange-50 px-2 py-0.5 rounded border border-orange-200">P1</span>';
+                return `<span class="text-slate-600 font-bold text-xs bg-slate-50 px-2 py-0.5 rounded border border-slate-200">${prio}</span>`;
+            };
+
+            let addFormHtml = '';
+            if (state.showAddTaskForm) {
+                addFormHtml = `
+                    <div class="bg-indigo-50 p-6 rounded-xl border border-indigo-100 mb-6 mt-6 fade-in shadow-sm">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-bold text-indigo-900 flex items-center gap-2"><i class="ph-bold ph-plus-circle"></i> Add New Task to ${state.selectedDeptTimeline}</h3>
+                            <button onclick="toggleAddTaskForm(false)" class="text-indigo-400 hover:text-indigo-600 bg-white rounded-full p-1 shadow-sm"><i class="ph-bold ph-x"></i></button>
+                        </div>
+                        <form onsubmit="submitNewTask(event)" class="space-y-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div class="col-span-1 md:col-span-2">
+                                    <label class="block text-xs font-bold text-indigo-800 uppercase mb-1">Task Title</label>
+                                    <input type="text" required value="${escapeHTML(state.newTaskFormData.task)}" oninput="handleNewTaskInput('task', this.value)" class="w-full p-2 text-sm border border-indigo-200 rounded focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-indigo-800 uppercase mb-1">Owner</label>
+                                    <input type="text" required value="${escapeHTML(state.newTaskFormData.owner)}" oninput="handleNewTaskInput('owner', this.value)" class="w-full p-2 text-sm border border-indigo-200 rounded focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                </div>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="block text-xs font-bold text-indigo-800 uppercase mb-1">Priority</label>
+                                        <select oninput="handleNewTaskInput('priority', this.value)" class="w-full p-2 text-sm border border-indigo-200 rounded focus:ring-2 focus:ring-indigo-500 outline-none">
+                                            <option value="P0" ${state.newTaskFormData.priority === 'P0' ? 'selected' : ''}>P0</option>
+                                            <option value="P1" ${state.newTaskFormData.priority === 'P1' ? 'selected' : ''}>P1</option>
+                                            <option value="P2" ${state.newTaskFormData.priority === 'P2' ? 'selected' : ''}>P2</option>
+                                            <option value="P3" ${state.newTaskFormData.priority === 'P3' ? 'selected' : ''}>P3</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-bold text-indigo-800 uppercase mb-1">Status</label>
+                                        <select oninput="handleNewTaskInput('status', this.value)" class="w-full p-2 text-sm border border-indigo-200 rounded focus:ring-2 focus:ring-indigo-500 outline-none">
+                                            <option value="Not Started" ${state.newTaskFormData.status === 'Not Started' ? 'selected' : ''}>Not Started</option>
+                                            <option value="In Progress" ${state.newTaskFormData.status === 'In Progress' ? 'selected' : ''}>In Progress</option>
+                                            <option value="Completed" ${state.newTaskFormData.status === 'Completed' ? 'selected' : ''}>Completed</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-indigo-800 uppercase mb-1">Start Date</label>
+                                    <input type="date" value="${escapeHTML(state.newTaskFormData.startDate)}" oninput="handleNewTaskInput('startDate', this.value)" class="w-full p-2 text-sm border border-indigo-200 rounded focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-indigo-800 uppercase mb-1">End Date</label>
+                                    <input type="date" value="${escapeHTML(state.newTaskFormData.endDate)}" oninput="handleNewTaskInput('endDate', this.value)" class="w-full p-2 text-sm border border-indigo-200 rounded focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                </div>
+                                <div class="col-span-1 md:col-span-2">
+                                    <label class="block text-xs font-bold text-indigo-800 uppercase mb-1">Notes / Description</label>
+                                    <textarea rows="2" oninput="handleNewTaskInput('notes', this.value)" class="w-full p-2 text-sm border border-indigo-200 rounded focus:ring-2 focus:ring-indigo-500 outline-none">${escapeHTML(state.newTaskFormData.notes)}</textarea>
+                                </div>
+                            </div>
+                            <div class="flex justify-end pt-2 border-t border-indigo-100 mt-4">
+                                <button type="submit" class="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold shadow-sm hover:bg-indigo-700 transition-colors mt-2">Save Task</button>
+                            </div>
+                        </form>
+                    </div>
+                `;
+            }
+
+            // --- Generate Timeline Chart ---
+            let chartHtml = '';
+            const tasksForChart = currentTasks.filter(t => t.startDate);
+            
+            if (tasksForChart.length > 0) {
+                const datesArray = tasksForChart.map(t => ({
+                    start: new Date(t.startDate).getTime(),
+                    end: t.endDate ? new Date(t.endDate).getTime() : new Date(t.startDate).getTime() + (1000 * 60 * 60 * 24 * 3) // Default 3 days if missing
+                }));
+                
+                const minTime = Math.min(...datesArray.map(d => d.start));
+                const maxTime = Math.max(...datesArray.map(d => d.end));
+                const totalDuration = maxTime - minTime || 86400000; // Provide min 1-day fallback avoiding division by zero
+                
+                const startLabel = new Date(minTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                const endLabel = new Date(maxTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+                const barsHtml = tasksForChart.map((task, idx) => {
+                    const startT = datesArray[idx].start;
+                    const endT = datesArray[idx].end;
+                    let left = ((startT - minTime) / totalDuration) * 100;
+                    let width = ((endT - startT) / totalDuration) * 100;
+                    
+                    if (width < 3) width = 3; // Ensure minimum visibility
+                    if (left + width > 100) width = 100 - left; // Bound to container
+
+                    const colorClass = task.status === 'Completed' ? 'bg-emerald-400 border-emerald-500' : 
+                                       task.status === 'In Progress' ? 'bg-blue-400 border-blue-500' : 
+                                       'bg-slate-300 border-slate-400';
+
+                    return `
+                        <div class="relative h-6 mb-2 group">
+                            <div class="absolute h-full rounded border ${colorClass} transition-all hover:brightness-110 flex items-center px-2 shadow-sm text-[10px] text-white font-bold truncate cursor-pointer z-10" style="left: ${left}%; width: ${width}%;">
+                                ${escapeHTML(task.task)}
+                            </div>
+                            <div class="hidden group-hover:block absolute z-20 bottom-full mb-1 bg-slate-900 text-white text-xs p-2 rounded whitespace-nowrap shadow-lg" style="left: ${left}%;">
+                                <strong class="block text-indigo-200">${escapeHTML(task.task)}</strong>
+                                ${task.startDate} &rarr; ${task.endDate || '(Estimated)'}<br>
+                                Owner: ${escapeHTML(task.owner)}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+                chartHtml = `
+                    <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm mb-6 mt-6 fade-in">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2"><i class="ph-fill ph-chart-line-up text-indigo-500"></i> Delivery Map</h3>
+                            <span class="text-xs font-semibold text-slate-500">${startLabel} - ${endLabel}</span>
+                        </div>
+                        <div class="relative w-full border-l-2 border-slate-300 pl-4 py-2 overflow-x-auto bg-slate-50 rounded-r-lg min-h-[100px] custom-scrollbar">
+                            <div class="min-w-[600px] pb-2 relative">
+                                <!-- Background guiding lines -->
+                                <div class="absolute inset-0 flex justify-between px-4 pointer-events-none opacity-20">
+                                    <div class="h-full border-l border-slate-400 border-dashed"></div>
+                                    <div class="h-full border-l border-slate-400 border-dashed"></div>
+                                    <div class="h-full border-l border-slate-400 border-dashed"></div>
+                                    <div class="h-full border-l border-slate-400 border-dashed"></div>
+                                </div>
+                                ${barsHtml}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            const taskRows = currentTasks.length > 0 ? currentTasks.map(task => {
+                const startStr = task.startDate ? new Date(task.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '--';
+                const endStr = task.endDate ? new Date(task.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '--';
+                
+                return `
+                    <div class="p-4 border-b border-slate-100 hover:bg-slate-50 transition-colors flex flex-col md:flex-row gap-4 items-start md:items-center">
+                        <div class="flex-1 min-w-[300px]">
+                            <div class="flex items-center gap-2 mb-1">
+                                ${getPriorityBadge(task.priority)}
+                                <h3 class="text-sm font-bold text-slate-800">${escapeHTML(task.task)}</h3>
+                            </div>
+                            <p class="text-xs text-slate-500 mt-1 line-clamp-2">${escapeHTML(task.notes)}</p>
+                        </div>
+                        <div class="w-full md:w-48 flex items-center gap-2 text-sm text-slate-600">
+                            <div class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-bold border border-indigo-200">
+                                ${task.owner.charAt(0)}
+                            </div>
+                            <span class="truncate">${escapeHTML(task.owner)}</span>
+                        </div>
+                        <div class="w-full md:w-40">
+                            <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Timeline</div>
+                            <div class="text-xs font-semibold text-slate-700 flex items-center gap-1">
+                                <i class="ph-bold ph-calendar-blank text-slate-400"></i> ${startStr} <i class="ph-bold ph-arrow-right text-slate-400"></i> ${endStr}
+                            </div>
+                        </div>
+                        <div class="w-full md:w-24 text-right">
+                            ${getStatusBadge(task.status)}
+                        </div>
+                    </div>
+                `;
+            }).join('') : `
+                <div class="p-12 text-center flex flex-col items-center">
+                    <div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-3">
+                        <i class="ph-bold ph-calendar-x text-2xl text-slate-400"></i>
+                    </div>
+                    <p class="text-slate-500 font-medium">No tasks logged for ${state.selectedDeptTimeline} yet.</p>
+                </div>
+            `;
+
+            return `
+                <div class="space-y-6 fade-in max-w-5xl mx-auto pb-10">
+                    <header class="mb-6 flex justify-between items-end">
+                        <div>
+                            <h1 class="text-2xl font-bold text-slate-800">Department Project Timelines</h1>
+                            <p class="text-slate-500">Track readiness, tasks, and deadlines across functional teams.</p>
+                        </div>
+                        <button onclick="toggleAddTaskForm(true)" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2">
+                            <i class="ph-bold ph-plus"></i> Add Task
+                        </button>
+                    </header>
+
+                    <!-- Tabs -->
+                    <div class="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
+                        ${tabsHtml}
+                    </div>
+
+                    ${addFormHtml}
+                    
+                    ${chartHtml}
+
+                    <!-- Task List -->
+                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mt-2">
+                        <div class="bg-slate-50 p-4 border-b border-slate-200 flex justify-between items-center">
+                            <h2 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                                <i class="ph-fill ph-list-dashes text-indigo-500"></i> 
+                                ${state.selectedDeptTimeline} Task Tracker
+                            </h2>
+                            <span class="text-xs font-semibold text-slate-500 bg-slate-200 px-2 py-1 rounded">${currentTasks.length} Tracked Items</span>
+                        </div>
+                        <div class="divide-y divide-slate-100">
+                            ${taskRows}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
         function render() {
             renderNav();
             const root = document.getElementById('app-root');
             if (state.currentView === 'dashboard') root.innerHTML = renderDashboard();
+            else if (state.currentView === 'timeline') root.innerHTML = renderTimeline();
             else if (state.currentView === 'intake') root.innerHTML = renderIntake();
             else if (state.currentView === 'internal-changes') root.innerHTML = renderInternalChanges();
             else if (state.currentView === 'project-detail') root.innerHTML = renderProjectDetail();
